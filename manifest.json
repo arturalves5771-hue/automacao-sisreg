@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Automação SISREG",
+    "version": "1.2",
+    "description": "Automação do SISREG com exportação e controle de login.",
+    "permissions": [
+        "tabs",
+        "storage",
+        "downloads"
+    ],
+    "host_permissions": [
+        "https://sisregiii.saude.gov.br/*",
+        "https://automacaosisregextensao.vercel.app/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://sisregiii.saude.gov.br/*",
+                "https://automacaosisregextensao.vercel.app/*",
+                "file:///*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
+}

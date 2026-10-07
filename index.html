@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automação SISREG</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f3f6f4;
+            color: #1f2937;
+        }
+        .container { width: min(900px, 92%); margin: 50px auto; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+        }
+        h1 { margin: 0 0 8px 0; color: #166534; font-size: 30px; }
+        .subtitulo { margin-bottom: 30px; color: #6b7280; }
+        .status {
+            padding: 14px 18px;
+            border-radius: 10px;
+            background: #f3f4f6;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        .status.conectado { background: #dcfce7; color: #166534; }
+        .status.erro { background: #fee2e2; color: #991b1b; }
+        label { display: block; margin-bottom: 7px; font-weight: bold; }
+        input {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 18px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #16a34a;
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+        }
+        button {
+            border: none;
+            border-radius: 9px;
+            padding: 13px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-login { width: 100%; background: #166534; color: white; }
+        .btn-login:hover { background: #14532d; }
+        .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+        .painel { display: none; }
+        .painel.visivel { display: block; }
+        .titulo-painel { font-size: 22px; margin: 0 0 20px 0; }
+        .exportacao {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 22px;
+            background: #fafafa;
+        }
+        .datas { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .btn-exportar { margin-top: 5px; background: #15803d; color: white; }
+        .btn-exportar:hover { background: #166534; }
+        .btn-exportar:disabled { opacity: 0.6; cursor: not-allowed; }
+        .mensagem { margin-top: 18px; padding: 12px; border-radius: 8px; display: none; }
+        .mensagem.sucesso { display: block; background: #dcfce7; color: #166534; }
+        .mensagem.erro { display: block; background: #fee2e2; color: #991b1b; }
+        .login-area { max-width: 450px; margin: auto; }
+        .oculto { display: none !important; }
+        @media (max-width: 600px) { .datas { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- LOGIN -->
+    <div class="card" id="cardLogin">
+        <div class="login-area">
+            <h1>Automação SISREG</h1>
+            <div class="subtitulo">Acesso ao sistema</div>
+            <div class="status" id="status">🔴 SISREG desconectado</div>
+
+            <label for="usuario">Usuário</label>
+            <input type="text" id="usuario" name="username" autocomplete="username" placeholder="Digite seu usuário">
+
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" name="password" autocomplete="current-password" placeholder="Digite sua senha">
+
+            <button class="btn-login" id="btnLogin">ENTRAR NO SISREG</button>
+        </div>
+    </div>
+
+    <!-- PAINEL -->
+    <div class="card painel" id="painel">
+        <h1>Automação SISREG</h1>
+        <div class="subtitulo">Painel de automação</div>
+        <div class="status conectado" id="statusPainel">🟢 SISREG conectado</div>
+
+        <div class="exportacao">
+            <div class="titulo-painel">📅 Exportação de Agenda</div>
+            <div class="datas">
+                <div>
+                    <label for="dataInicial">Data inicial</label>
+                    <input type="date" id="dataInicial">
+                </div>
+                <div>
+                    <label for="dataFinal">Data final</label>
+                    <input type="date" id="dataFinal">
+                </div>
+            </div>
+
+            <button class="btn-exportar" id="btnExportar">EXPORTAR CSV</button>
+            <div class="mensagem" id="mensagem"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const cardLogin = document.getElementById("cardLogin");
+const painel = document.getElementById("painel");
+const usuario = document.getElementById("usuario");
+const senha = document.getElementById("senha");
+const btnLogin = document.getElementById("btnLogin");
+const status = document.getElementById("status");
+const dataInicial = document.getElementById("dataInicial");
+const dataFinal = document.getElementById("dataFinal");
+const btnExportar = document.getElementById("btnExportar");
+const mensagem = document.getElementById("mensagem");
+
+/*
+=========================================================
+PREENCHER DATAS PADRÃO (HOJE + 1 e HOJE + 7)
+=========================================================
+*/
+function inicializarDatasPadrao() {
+    const hoje = new Date();
+
+    // Data Inicial = Hoje + 1 dia
+    const ini = new Date(hoje);
+    ini.setDate(ini.getDate() + 1);
+
+    // Data Final = Hoje + 7 dias
+    const fim = new Date(hoje);
+    fim.setDate(fim.getDate() + 7);
+
+    const formatarISO = (d) => {
+        const ano = d.getFullYear();
+        const mes = String(d.getMonth() + 1).padStart(2, '0');
+        const dia = String(d.getDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+    };
+
+    dataInicial.value = formatarISO(ini);
+    dataFinal.value = formatarISO(fim);
+}
+
+document.addEventListener("DOMContentLoaded", inicializarDatasPadrao);
+
+/*
+=========================================================
+LOGIN
+=========================================================
+*/
+btnLogin.addEventListener("click", function () {
+    const user = usuario.value.trim();
+    const pass = senha.value;
+
+    if (!user || !pass) {
+        status.textContent = "⚠️ Informe usuário e senha.";
+        status.className = "status erro";
+        return;
+    }
+
+    status.textContent = "🟡 Conectando ao SISREG...";
+    status.className = "status";
+    btnLogin.disabled = true;
+
+    window.postMessage({
+        type: "SISREG_LOGIN",
+        username: user,
+        password: pass
+    }, "*");
+});
+
+/*
+=========================================================
+RECEBER MENSAGENS DO CONTENT SCRIPT
+=========================================================
+*/
+window.addEventListener("message", function (event) {
+    if (event.source !== window || !event.data) return;
+
+    if (event.data.type === "LOGIN_SISREG_SUCESSO") {
+        console.log("SISREG CONECTADO.");
+        cardLogin.classList.add("oculto");
+        painel.classList.add("visivel");
+        return;
+    }
+
+    if (event.data.type === "LOGIN_SISREG_ERRO") {
+        btnLogin.disabled = false;
+        status.textContent = "✕ " + (event.data.mensagem || "Erro no login.");
+        status.className = "status erro";
+        return;
+    }
+
+    if (event.data.type === "EXPORTACAO_SUCESSO") {
+        btnExportar.disabled = false;
+        btnExportar.textContent = "EXPORTAR CSV";
+        mensagem.textContent = "✓ " + event.data.mensagem;
+        mensagem.className = "mensagem sucesso";
+        return;
+    }
+
+    if (event.data.type === "EXPORTACAO_ERRO") {
+        btnExportar.disabled = false;
+        btnExportar.textContent = "EXPORTAR CSV";
+        mensagem.textContent = "✕ " + event.data.mensagem;
+        mensagem.className = "mensagem erro";
+        return;
+    }
+});
+
+/*
+=========================================================
+EXPORTAR CSV
+=========================================================
+*/
+btnExportar.addEventListener("click", function () {
+    const inicial = dataInicial.value;
+    const final = dataFinal.value;
+
+    if (!inicial || !final) {
+        mensagem.textContent = "Informe a data inicial e a data final.";
+        mensagem.className = "mensagem erro";
+        return;
+    }
+
+    if (inicial > final) {
+        mensagem.textContent = "A data inicial não pode ser maior que a data final.";
+        mensagem.className = "mensagem erro";
+        return;
+    }
+
+    const partesInicial = inicial.split("-");
+    const partesFinal = final.split("-");
+
+    const dataInicialSISREG = `${partesInicial[2]}/${partesInicial[1]}/${partesInicial[0]}`;
+    const dataFinalSISREG = `${partesFinal[2]}/${partesFinal[1]}/${partesFinal[0]}`;
+
+    btnExportar.disabled = true;
+    btnExportar.textContent = "EXPORTANDO...";
+    mensagem.textContent = "⏳ Consultando o SISREG e preparando o arquivo...";
+    mensagem.className = "mensagem sucesso";
+
+    window.postMessage({
+        type: "EXPORTAR_CSV",
+        dataInicial: dataInicialSISREG,
+        dataFinal: dataFinalSISREG
+    }, "*");
+});
+</script>
+</body>
+</html>
