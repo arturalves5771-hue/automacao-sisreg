@@ -202,36 +202,75 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     if (message.type === "EFETUAR_DOWNLOAD_SUBSTITUIR") {
         const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
 
-        chrome.downloads.download({
-            url: message.dataUrl,
-            filename: message.nomeArquivo,
-            conflictAction: "overwrite"
-        }, async (downloadId) => {
-            if (chrome.runtime.lastError) {
-                if (dados.abaNossaPagina) {
-                    chrome.tabs.sendMessage(dados.abaNossaPagina, {
-                        type: "EXPORTACAO_ERRO",
-                        mensagem: "Erro ao salvar arquivo: " + chrome.runtime.lastError.message
-                    });
-                }
-            } else {
-                if (dados.abaNossaPagina) {
-                    chrome.tabs.sendMessage(dados.abaNossaPagina, {
-                        type: "EXPORTACAO_SUCESSO",
-                        mensagem: "CSV exportado e atualizado com sucesso (" + message.nomeArquivo + ")"
-                    });
-                }
-            }
+        if (!dados.abaNossaPagina) return;
 
-            await chrome.storage.session.set({ operacaoAtual: null });
-            await chrome.storage.session.remove(["exportacaoCSV", "exportacaoIniciada"]);
+        try {
+            await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                type: "ARQUIVO_CSV_PRONTO",
+                dataUrl: message.dataUrl,
+                nomeArquivo: message.nomeArquivo
+            });
+        } catch (e) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: "EXPORTACAO_ERRO",
+                    mensagem: "Não foi possível enviar o CSV para a página de gravação: " + e.message
+                });
+            } catch (erro) {}
+        }
 
-            if (dados.abaSISREG) {
-                setTimeout(async () => {
-                    try { await chrome.tabs.remove(dados.abaSISREG); } catch (e) {}
-                }, 1000);
-            }
-        });
+        return;
+    }
+
+    /*
+    =================================================
+    CONFIRMAÇÃO DE GRAVAÇÃO DIRETA NA PASTA
+    =================================================
+    */
+    if (message.type === "ARQUIVO_SALVO_DIRETO") {
+        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
+
+        if (dados.abaNossaPagina) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: "EXPORTACAO_SUCESSO",
+                    mensagem: "CSV salvo diretamente na pasta SISREG3 (" + message.nomeArquivo + ")"
+                });
+            } catch (e) {}
+        }
+
+        await chrome.storage.session.set({ operacaoAtual: null });
+        await chrome.storage.session.remove(["exportacaoCSV", "exportacaoIniciada"]);
+
+        if (dados.abaSISREG) {
+            setTimeout(async () => {
+                try { await chrome.tabs.remove(dados.abaSISREG); } catch (e) {}
+            }, 1000);
+        }
+
+        return;
+    }
+
+    if (message.type === "ERRO_SALVAR_ARQUIVO") {
+        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
+
+        if (dados.abaNossaPagina) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: "EXPORTACAO_ERRO",
+                    mensagem: "Erro ao gravar o CSV na pasta: " + message.mensagem
+                });
+            } catch (e) {}
+        }
+
+        await chrome.storage.session.set({ operacaoAtual: null });
+        await chrome.storage.session.remove(["exportacaoCSV", "exportacaoIniciada"]);
+
+        if (dados.abaSISREG) {
+            setTimeout(async () => {
+                try { await chrome.tabs.remove(dados.abaSISREG); } catch (e) {}
+            }, 500);
+        }
 
         return;
     }
