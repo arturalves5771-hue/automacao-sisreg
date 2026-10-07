@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Automação SISREG",
-    "version": "1.5",
+    "version": "1.6",
     "description": "Automação do SISREG com login inteligente, datas automáticas e exportação automática.",
     "permissions": [
         "tabs",
