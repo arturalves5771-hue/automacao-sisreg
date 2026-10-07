@@ -26,6 +26,22 @@ window.addEventListener("message", function (event) {
         });
         return;
     }
+
+    if (event.data.type === "ARQUIVO_SALVO_DIRETO") {
+        chrome.runtime.sendMessage({
+            type: "ARQUIVO_SALVO_DIRETO",
+            nomeArquivo: event.data.nomeArquivo
+        });
+        return;
+    }
+
+    if (event.data.type === "ERRO_SALVAR_ARQUIVO") {
+        chrome.runtime.sendMessage({
+            type: "ERRO_SALVAR_ARQUIVO",
+            mensagem: event.data.mensagem
+        });
+        return;
+    }
 });
 
 /*
@@ -41,6 +57,15 @@ chrome.runtime.onMessage.addListener(function (message) {
 
     if (message.type === "LOGIN_SISREG_ERRO") {
         window.postMessage({ type: "LOGIN_SISREG_ERRO", mensagem: message.mensagem }, "*");
+        return;
+    }
+
+    if (message.type === "ARQUIVO_CSV_PRONTO") {
+        window.postMessage({
+            type: "ARQUIVO_CSV_PRONTO",
+            dataUrl: message.dataUrl,
+            nomeArquivo: message.nomeArquivo
+        }, "*");
         return;
     }
 
