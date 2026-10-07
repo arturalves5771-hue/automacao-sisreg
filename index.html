@@ -218,6 +218,21 @@
             🟢 SISREG conectado
         </div>
 
+        <!-- PASTA DE DESTINO -->
+        <div class="exportacao" style="margin-bottom: 18px;">
+            <div class="titulo-painel">
+                📁 Pasta de destino do CSV
+            </div>
+
+            <button class="btn-exportar" id="btnSelecionarPasta" type="button">
+                SELECIONAR PASTA
+            </button>
+
+            <div class="mensagem" id="statusPasta" style="display: block; margin-top: 12px;">
+                ⚠️ Nenhuma pasta configurada.
+            </div>
+        </div>
+
         <!-- EXPORTAÇÃO -->
         <div class="exportacao">
             <div class="titulo-painel">
@@ -263,15 +278,24 @@ const dataInicial = document.getElementById("dataInicial");
 const dataFinal = document.getElementById("dataFinal");
 const btnExportar = document.getElementById("btnExportar");
 const mensagem = document.getElementById("mensagem");
+const btnSelecionarPasta = document.getElementById("btnSelecionarPasta");
+const statusPasta = document.getElementById("statusPasta");
+
+let pastaSISREG = null;
+const DB_NOME = "AutomacaoSISREG";
+const DB_VERSAO = 1;
+const DB_STORE = "configuracoes";
+const DB_CHAVE_PASTA = "pastaSISREG";
 
 /*
 =========================================================
 INICIALIZAÇÃO E TECLA ENTER
 =========================================================
 */
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
     carregarDatasPadrao();
     if (usuario) usuario.focus();
+    await inicializarPastaSISREG();
 });
 
 // Ao pressionar Enter no usuário, foca na senha
@@ -281,6 +305,216 @@ usuario.addEventListener("keydown", function (event) {
         senha.focus();
     }
 });
+
+/*
+=========================================================
+PASTA DE DESTINO DO CSV
+=========================================================
+*/
+function abrirBancoDados() {
+    return new Promise(function (resolve, reject) {
+        const request = indexedDB.open(DB_NOME, DB_VERSAO);
+
+        request.onupgradeneeded = function () {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(DB_STORE)) {
+                db.createObjectStore(DB_STORE);
+            }
+        };
+
+        request.onsuccess = function () {
+            resolve(request.result);
+        };
+
+        request.onerror = function () {
+            reject(request.error);
+        };
+    });
+}
+
+async function salvarHandlePasta(handle) {
+    const db = await abrirBancoDados();
+
+    return new Promise(function (resolve, reject) {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(handle, DB_CHAVE_PASTA);
+
+        tx.oncomplete = function () {
+            db.close();
+            resolve();
+        };
+
+        tx.onerror = function () {
+            db.close();
+            reject(tx.error);
+        };
+    });
+}
+
+async function carregarHandlePasta() {
+    const db = await abrirBancoDados();
+
+    return new Promise(function (resolve, reject) {
+        const tx = db.transaction(DB_STORE, "readonly");
+        const request = tx.objectStore(DB_STORE).get(DB_CHAVE_PASTA);
+
+        request.onsuccess = function () {
+            db.close();
+            resolve(request.result || null);
+        };
+
+        request.onerror = function () {
+            db.close();
+            reject(request.error);
+        };
+    });
+}
+
+async function verificarPermissaoPasta(handle, solicitar) {
+    if (!handle) return false;
+
+    const opcoes = { mode: "readwrite" };
+
+    try {
+        if (await handle.queryPermission(opcoes) === "granted") {
+            return true;
+        }
+
+        if (solicitar && await handle.requestPermission(opcoes) === "granted") {
+            return true;
+        }
+    } catch (erro) {
+        console.error("Erro ao verificar permissão da pasta:", erro);
+    }
+
+    return false;
+}
+
+function atualizarStatusPasta(texto, tipo) {
+    statusPasta.textContent = texto;
+    statusPasta.className = "mensagem " + (tipo || "");
+    statusPasta.style.display = "block";
+}
+
+async function inicializarPastaSISREG() {
+    if (!window.showDirectoryPicker || !window.indexedDB) {
+        atualizarStatusPasta(
+            "❌ Este Chrome não oferece suporte à gravação direta em pasta.",
+            "erro"
+        );
+        return;
+    }
+
+    try {
+        pastaSISREG = await carregarHandlePasta();
+
+        if (!pastaSISREG) {
+            atualizarStatusPasta(
+                "⚠️ Selecione a pasta de rede onde os CSVs serão salvos.",
+                "erro"
+            );
+            return;
+        }
+
+        const permitida = await verificarPermissaoPasta(pastaSISREG, false);
+
+        if (permitida) {
+            atualizarStatusPasta(
+                "✅ Pasta configurada: " + pastaSISREG.name,
+                "sucesso"
+            );
+            btnSelecionarPasta.textContent = "ALTERAR PASTA";
+        } else {
+            atualizarStatusPasta(
+                "🔐 A pasta " + pastaSISREG.name + " está cadastrada. Clique em "Autorizar pasta" para liberar a gravação.",
+                "erro"
+            );
+            btnSelecionarPasta.textContent = "AUTORIZAR PASTA";
+        }
+    } catch (erro) {
+        console.error("Erro ao carregar pasta SISREG:", erro);
+        pastaSISREG = null;
+        atualizarStatusPasta(
+            "⚠️ Não foi possível recuperar a pasta configurada. Selecione novamente.",
+            "erro"
+        );
+    }
+}
+
+btnSelecionarPasta.addEventListener("click", async function () {
+    try {
+        const novaPasta = await window.showDirectoryPicker({
+            mode: "readwrite"
+        });
+
+        const permitida = await verificarPermissaoPasta(novaPasta, true);
+
+        if (!permitida) {
+            atualizarStatusPasta(
+                "❌ Permissão de gravação não concedida.",
+                "erro"
+            );
+            return;
+        }
+
+        pastaSISREG = novaPasta;
+        await salvarHandlePasta(pastaSISREG);
+
+        atualizarStatusPasta(
+            "✅ Pasta configurada: " + pastaSISREG.name,
+            "sucesso"
+        );
+
+        btnSelecionarPasta.textContent = "ALTERAR PASTA";
+    } catch (erro) {
+        if (erro && erro.name !== "AbortError") {
+            console.error("Erro ao selecionar pasta:", erro);
+            atualizarStatusPasta(
+                "❌ Não foi possível configurar a pasta: " + erro.message,
+                "erro"
+            );
+        }
+    }
+});
+
+async function garantirPastaSISREG() {
+    if (!pastaSISREG) {
+        atualizarStatusPasta(
+            "⚠️ Selecione a pasta de rede antes de exportar.",
+            "erro"
+        );
+        return false;
+    }
+
+    const permitida = await verificarPermissaoPasta(pastaSISREG, true);
+
+    if (!permitida) {
+        atualizarStatusPasta(
+            "❌ O Chrome não autorizou a gravação nessa pasta.",
+            "erro"
+        );
+        return false;
+    }
+
+    return true;
+}
+
+async function salvarCSVNaPasta(dataUrl, nomeArquivo) {
+    if (!pastaSISREG) {
+        throw new Error("Pasta de destino não configurada.");
+    }
+
+    const resposta = await fetch(dataUrl);
+    const blob = await resposta.blob();
+
+    const arquivo = await pastaSISREG.getFileHandle(nomeArquivo, {
+        create: true
+    });
+
+    const gravador = await arquivo.createWritable();
+    await gravador.write(blob);
+    await gravador.close();
+}
 
 /*
 =========================================================
@@ -356,6 +590,29 @@ window.addEventListener("message", function (event) {
         return;
     }
 
+    if (event.data.type === "ARQUIVO_CSV_PRONTO") {
+        salvarCSVNaPasta(event.data.dataUrl, event.data.nomeArquivo)
+            .then(function () {
+                atualizarStatusPasta(
+                    "✅ Arquivo salvo em " + pastaSISREG.name,
+                    "sucesso"
+                );
+
+                window.postMessage({
+                    type: "ARQUIVO_SALVO_DIRETO",
+                    nomeArquivo: event.data.nomeArquivo
+                }, "*");
+            })
+            .catch(function (erro) {
+                window.postMessage({
+                    type: "ERRO_SALVAR_ARQUIVO",
+                    mensagem: erro.message
+                }, "*");
+            });
+
+        return;
+    }
+
     if (event.data.type === "EXPORTACAO_SUCESSO") {
         btnExportar.disabled = false;
         btnExportar.textContent = "EXPORTAR CSV";
@@ -378,7 +635,11 @@ window.addEventListener("message", function (event) {
 EXPORTAR CSV
 =========================================================
 */
-btnExportar.addEventListener("click", function () {
+btnExportar.addEventListener("click", async function () {
+    if (!(await garantirPastaSISREG())) {
+        return;
+    }
+
     const inicial = dataInicial.value;
     const final = dataFinal.value;
 
