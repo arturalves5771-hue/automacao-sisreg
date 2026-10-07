@@ -184,9 +184,9 @@
 
 <div class="container">
 
-    <!-- LOGIN -->
+    <!-- FORMULÁRIO DE LOGIN -->
     <div class="card" id="cardLogin">
-        <div class="login-area">
+        <form class="login-area" id="formLogin" action="javascript:void(0);">
             <h1>Automação SISREG</h1>
             <div class="subtitulo">Acesso ao sistema</div>
 
@@ -195,15 +195,15 @@
             </div>
 
             <label for="usuario">Usuário</label>
-            <input type="text" id="usuario" name="username" autocomplete="username" placeholder="Digite seu usuário">
+            <input type="text" id="usuario" name="username" autocomplete="username" placeholder="Digite seu usuário" required>
 
             <label for="senha">Senha</label>
-            <input type="password" id="senha" name="password" autocomplete="current-password" placeholder="Digite sua senha">
+            <input type="password" id="senha" name="password" autocomplete="current-password" placeholder="Digite sua senha" required>
 
-            <button class="btn-login" id="btnLogin">
+            <button type="submit" class="btn-login" id="btnLogin">
                 ENTRAR NO SISREG
             </button>
-        </div>
+        </form>
     </div>
 
     <!-- PAINEL -->
@@ -250,6 +250,7 @@ ELEMENTOS
 =========================================================
 */
 const cardLogin = document.getElementById("cardLogin");
+const formLogin = document.getElementById("formLogin");
 const painel = document.getElementById("painel");
 const usuario = document.getElementById("usuario");
 const senha = document.getElementById("senha");
@@ -262,7 +263,7 @@ const mensagem = document.getElementById("mensagem");
 
 /*
 =========================================================
-NAVEGAÇÃO COM A TECLA ENTER
+INICIALIZAÇÃO E TECLA ENTER
 =========================================================
 */
 document.addEventListener("DOMContentLoaded", function () {
@@ -270,19 +271,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if (usuario) usuario.focus();
 });
 
-// Enter no Usuário -> move o foco para a Senha
+// Ao pressionar Enter no usuário, foca na senha
 usuario.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
         event.preventDefault();
         senha.focus();
-    }
-});
-
-// Enter na Senha -> aciona o botão de Login
-senha.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        btnLogin.click();
     }
 });
 
@@ -313,10 +306,12 @@ function carregarDatasPadrao() {
 
 /*
 =========================================================
-LOGIN
+SUBMIT DO LOGIN (Ativa salvamento de senha no navegador)
 =========================================================
 */
-btnLogin.addEventListener("click", function () {
+formLogin.addEventListener("submit", function (event) {
+    event.preventDefault();
+
     const user = usuario.value.trim();
     const pass = senha.value;
 
@@ -347,4 +342,73 @@ window.addEventListener("message", function (event) {
 
     if (event.data.type === "LOGIN_SISREG_SUCESSO") {
         cardLogin.classList.add("oculto");
-        painel.classList.add
+        painel.classList.add("visivel");
+        return;
+    }
+
+    if (event.data.type === "LOGIN_SISREG_ERRO") {
+        status.textContent = "✕ " + (event.data.mensagem || "Login ou senha incorreto(s).");
+        status.className = "status erro";
+        btnLogin.disabled = false;
+        return;
+    }
+
+    if (event.data.type === "EXPORTACAO_SUCESSO") {
+        btnExportar.disabled = false;
+        btnExportar.textContent = "EXPORTAR CSV";
+        mensagem.textContent = "✓ " + event.data.mensagem;
+        mensagem.className = "mensagem sucesso";
+        return;
+    }
+
+    if (event.data.type === "EXPORTACAO_ERRO") {
+        btnExportar.disabled = false;
+        btnExportar.textContent = "EXPORTAR CSV";
+        mensagem.textContent = "✕ " + event.data.mensagem;
+        mensagem.className = "mensagem erro";
+        return;
+    }
+});
+
+/*
+=========================================================
+EXPORTAR CSV
+=========================================================
+*/
+btnExportar.addEventListener("click", function () {
+    const inicial = dataInicial.value;
+    const final = dataFinal.value;
+
+    if (!inicial || !final) {
+        mensagem.textContent = "Informe a data inicial e a data final.";
+        mensagem.className = "mensagem erro";
+        return;
+    }
+
+    if (inicial > final) {
+        mensagem.textContent = "A data inicial não pode ser maior que a data final.";
+        mensagem.className = "mensagem erro";
+        return;
+    }
+
+    const partesInicial = inicial.split("-");
+    const partesFinal = final.split("-");
+
+    const dataInicialSISREG = partesInicial[2] + "/" + partesInicial[1] + "/" + partesInicial[0];
+    const dataFinalSISREG = partesFinal[2] + "/" + partesFinal[1] + "/" + partesFinal[0];
+
+    btnExportar.disabled = true;
+    btnExportar.textContent = "EXPORTANDO...";
+    mensagem.textContent = "⏳ Consultando o SISREG e preparando o arquivo...";
+    mensagem.className = "mensagem sucesso";
+
+    window.postMessage({
+        type: "EXPORTAR_CSV",
+        dataInicial: dataInicialSISREG,
+        dataFinal: dataFinalSISREG
+    }, "*");
+});
+</script>
+
+</body>
+</html>
