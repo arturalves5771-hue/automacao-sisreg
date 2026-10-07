@@ -51,6 +51,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         await chrome.storage.session.set({
             operacaoAtual: "exportar_csv",
             exportacaoCSV: { dataInicial: message.dataInicial, dataFinal: message.dataFinal },
+            exportacaoIniciada: false,
             abaNossaPagina: abaNossaPagina
         });
 
@@ -74,7 +75,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         if (!tabId) return;
 
         const dados = await chrome.storage.session.get([
-            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "tentativaEnviada"
+            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada"
         ]);
 
         if (dados.abaSISREG !== tabId) return;
@@ -173,6 +174,14 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 const exportacao = dados.exportacaoCSV;
                 if (!exportacao) return;
 
+                // O SISREG pode informar "telaLogin=false" mais de uma vez
+                // durante o carregamento. A exportação deve ser executada apenas uma vez.
+                if (dados.exportacaoIniciada) return;
+
+                await chrome.storage.session.set({
+                    exportacaoIniciada: true
+                });
+
                 try {
                     await chrome.tabs.sendMessage(tabId, {
                         type: "EXECUTAR_EXPORTACAO_CSV",
@@ -215,7 +224,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             }
 
             await chrome.storage.session.set({ operacaoAtual: null });
-            await chrome.storage.session.remove("exportacaoCSV");
+            await chrome.storage.session.remove(["exportacaoCSV", "exportacaoIniciada"]);
 
             if (dados.abaSISREG) {
                 setTimeout(async () => {
