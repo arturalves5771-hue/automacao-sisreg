@@ -9,7 +9,7 @@ window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
 
     if (event.data.type === "CONSULTAR_DADOS_CNS") {
-        const numero = String(event.data.numero || "").replace(/\\D/g, "");
+        const numero = String(event.data.numero || "").replace(/\D/g, "");
         if (!numero) return;
         chrome.runtime.sendMessage({
             type: "CONSULTAR_DADOS_CNS",
@@ -257,7 +257,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 const opcaoCNS = opcoes.find(function (elemento) {
                     const texto = (elemento.innerText || elemento.value || elemento.getAttribute("title") || "").trim();
                     const alvo = (elemento.getAttribute("href") || "") + " " + (elemento.getAttribute("onclick") || "");
-                    return /\\bCNS\\b/i.test(texto) || /cns/i.test(alvo);
+                    return /\bCNS\b/i.test(texto) || /cns/i.test(alvo);
                 });
 
                 if (!opcaoCNS) throw new Error("Não localizei a opção CNS no menu do SISREG.");
