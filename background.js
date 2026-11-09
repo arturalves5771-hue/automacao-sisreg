@@ -7,6 +7,45 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
 
     /*
     =================================================
+    NOVA OPERAÇÃO: CONSULTA POR CNS / CPF
+    =================================================
+    */
+    if (message.type === "CONSULTAR_DADOS_CNS") {
+        if (sender.tab) abaNossaPagina = sender.tab.id;
+        const numero = String(message.numero || "").replace(/\\D/g, "");
+        if (numero.length !== 11 && numero.length !== 15) {
+            if (abaNossaPagina) {
+                try {
+                    await chrome.tabs.sendMessage(abaNossaPagina, {
+                        type: "CONSULTA_CNS_ERRO",
+                        mensagem: "Informe um CNS com 15 dígitos ou CPF com 11 dígitos."
+                    });
+                } catch (e) {}
+            }
+            return;
+        }
+
+        await chrome.storage.session.set({
+            operacaoAtual: "consultar_cns",
+            consultaCNS: { numero: numero },
+            consultaCNSIniciada: false,
+            consultaCNSAguardandoNavegacao: false,
+            consultaCNSAguardandoResultado: false,
+            abaNossaPagina: abaNossaPagina
+        });
+
+        const tab = await chrome.tabs.create({
+            url: "https://sisregiii.saude.gov.br/cgi-bin/index",
+            active: false
+        });
+        abaSISREG = tab.id;
+        await chrome.storage.session.set({ abaSISREG: tab.id });
+        return;
+    }
+
+
+    /*
+    =================================================
     SOLICITAÇÃO DE LOGIN
     =================================================
     */
@@ -75,10 +114,46 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         if (!tabId) return;
 
         const dados = await chrome.storage.session.get([
-            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada"
+            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"
         ]);
 
         if (dados.abaSISREG !== tabId) return;
+
+
+        /*
+        ---------------------------------------------
+        OPERAÇÃO: CONSULTA CNS / CPF
+        ---------------------------------------------
+        */
+        if (dados.operacaoAtual === "consultar_cns") {
+            if (message.telaLogin === true) {
+                if (dados.abaNossaPagina) {
+                    try {
+                        await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                            type: "CONSULTA_CNS_ERRO",
+                            mensagem: "Sessão do SISREG não autenticada. Faça login novamente e tente a consulta."
+                        });
+                    } catch (e) {}
+                }
+                await chrome.storage.session.set({ operacaoAtual: null });
+                await chrome.storage.session.remove(["consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"]);
+                setTimeout(async () => { try { await chrome.tabs.remove(tabId); } catch (e) {} }, 500);
+                return;
+            }
+
+            if (message.telaLogin === false) {
+                if (!dados.consultaCNSIniciada) {
+                    await chrome.storage.session.set({ consultaCNSIniciada: true });
+                    try {
+                        await chrome.tabs.sendMessage(tabId, {
+                            type: "EXECUTAR_CONSULTA_CNS",
+                            numero: dados.consultaCNS?.numero
+                        });
+                    } catch (e) {}
+                }
+                return;
+            }
+        }
 
         /*
         ---------------------------------------------
@@ -194,6 +269,39 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         }
     }
 
+
+    if (message.type === "CONSULTA_CNS_NAVEGACAO_INICIADA") {
+        await chrome.storage.session.set({ consultaCNSAguardandoNavegacao: true });
+        return;
+    }
+
+    if (message.type === "CONSULTA_CNS_PESQUISA_ENVIADA") {
+        await chrome.storage.session.set({
+            consultaCNSAguardandoNavegacao: false,
+            consultaCNSAguardandoResultado: true
+        });
+        return;
+    }
+
+    if (message.type === "DADOS_CNS_SUCESSO" || message.type === "CONSULTA_CNS_ERRO") {
+        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
+        if (dados.abaNossaPagina) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: message.type,
+                    jsonData: message.jsonData,
+                    mensagem: message.mensagem
+                });
+            } catch (e) {}
+        }
+        await chrome.storage.session.set({ operacaoAtual: null });
+        await chrome.storage.session.remove(["consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"]);
+        if (dados.abaSISREG) {
+            setTimeout(async () => { try { await chrome.tabs.remove(dados.abaSISREG); } catch (e) {} }, 900);
+        }
+        return;
+    }
+
     /*
     =================================================
     DOWNLOAD E SUBSTITUIÇÃO DO CSV
@@ -301,5 +409,39 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             }, 500);
         }
         return;
+    }
+});
+
+
+/*
+=========================================================
+CONTINUIDADE DA CONSULTA CNS APÓS NAVEGAÇÃO DO SISREG
+=========================================================
+*/
+chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
+    if (changeInfo.status !== "complete") return;
+
+    const dados = await chrome.storage.session.get([
+        "abaSISREG", "operacaoAtual", "consultaCNS",
+        "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"
+    ]);
+    if (dados.abaSISREG !== tabId || dados.operacaoAtual !== "consultar_cns") return;
+
+    if (dados.consultaCNSAguardandoNavegacao) {
+        await chrome.storage.session.set({ consultaCNSAguardandoNavegacao: false, consultaCNSIniciada: true });
+        try {
+            await chrome.tabs.sendMessage(tabId, {
+                type: "EXECUTAR_CONSULTA_CNS",
+                numero: dados.consultaCNS?.numero
+            });
+        } catch (e) {}
+        return;
+    }
+
+    if (dados.consultaCNSAguardandoResultado) {
+        await chrome.storage.session.set({ consultaCNSAguardandoResultado: false });
+        try {
+            await chrome.tabs.sendMessage(tabId, { type: "CAPTURAR_RESULTADO_CNS" });
+        } catch (e) {}
     }
 });
