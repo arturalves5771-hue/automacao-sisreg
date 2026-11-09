@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     */
     if (message.type === "CONSULTAR_DADOS_CNS") {
         if (sender.tab) abaNossaPagina = sender.tab.id;
-        const numero = String(message.numero || "").replace(/\\D/g, "");
+        const numero = String(message.numero || "").replace(/\D/g, "");
         if (numero.length !== 11 && numero.length !== 15) {
             if (abaNossaPagina) {
                 try {
