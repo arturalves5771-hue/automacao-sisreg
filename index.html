@@ -868,10 +868,46 @@ function localizarValorCNS(dados, padroes) {
     return "";
 }
 
+function extrairResumoDoTextoCNS(texto) {
+    const clean = String(texto || "").replace(/\\r\\n/g, "\\n").replace(/\\r/g, "\\n");
+
+    // Replica a lógica que já funcionava no conversor CADWEB enviado.
+    let nome = "";
+    const nomeBlock = clean.match(/Nome:\\s*Nome Social \/ Apelido:\\s*([\\s\\S]*?)(?=Nome da Mãe:)/i);
+    if (nomeBlock) {
+        const valor = nomeBlock[1].trim().replace(/\\n/g, " ");
+        nome = valor.includes("---") ? valor.split("---")[0].trim() : valor;
+    }
+
+    let mae = "";
+    const paisBlock = clean.match(/Nome da Mãe:\\s*Nome do Pai:\\s*([\\s\\S]*?)(?=Sexo:)/i);
+    if (paisBlock) {
+        const valor = paisBlock[1].trim().replace(/\\n/g, " ");
+        const palavras = valor.split(/\\s+/).filter(Boolean);
+        if (palavras.length >= 4) {
+            const meio = Math.floor(palavras.length / 2);
+            mae = palavras.slice(0, meio).join(" ");
+        } else {
+            mae = valor;
+        }
+    }
+
+    const cnsMatch = clean.match(/CNS:\\s*(\\d{15})/i);
+    return {
+        nome: nome,
+        mae: mae,
+        cns: cnsMatch ? cnsMatch[1] : ""
+    };
+}
+
 function exibirResumoPacienteCNS(dados) {
-    const nome = localizarValorCNS(dados, [/^NOME(?: DO PACIENTE| DO USUARIO)?$/]);
-    const cartao = localizarValorCNS(dados, [/^CNS$/, /CARTAO NACIONAL DE SAUDE/, /^NUMERO DO CARTAO SUS$/]);
-    const mae = localizarValorCNS(dados, [/^NOME DA MAE$/, /^MAE$/]);
+    const texto = dados && typeof dados.texto === "string" ? dados.texto : "";
+    const resumoTexto = extrairResumoDoTextoCNS(texto);
+
+    // O texto bruto do CADWEB é a fonte principal; as tabelas/campos ficam como reserva.
+    const nome = resumoTexto.nome || localizarValorCNS(dados, [/^NOME(?: DO PACIENTE| DO USUARIO)?$/]);
+    const cartao = resumoTexto.cns || localizarValorCNS(dados, [/^CNS$/, /CARTAO NACIONAL DE SAUDE/, /^NUMERO DO CARTAO SUS$/]);
+    const mae = resumoTexto.mae || localizarValorCNS(dados, [/^NOME DA MAE$/, /^MAE$/]);
 
     nomePacienteCNS.textContent = nome || "Nome não identificado";
     cartaoSUSCNS.textContent = cartao ? "🟢 CNS: " + cartao : "🟢 Consulta realizada";
