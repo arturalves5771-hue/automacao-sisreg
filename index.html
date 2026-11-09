@@ -302,6 +302,96 @@
         .resultado-cns{margin-top:16px;padding:16px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--line);border-radius:10px;background:#f7faf8;color:#344a44;font:13px/1.5 Consolas,"Courier New",monospace}
         @media(max-width:700px){.container{width:min(calc(100% - 24px),600px);margin:12px auto}.card{border-radius:16px}.app-header{padding:23px 20px}.app-header-inner{align-items:flex-start;flex-direction:column;gap:16px}.status-header{align-self:flex-start}.painel-conteudo{padding:15px;gap:14px}.exportacao{padding:18px;border-radius:14px}.datas{grid-template-columns:1fr;gap:0}.acoes-consulta-cns{flex-direction:column}.acoes-consulta-cns button{width:100%;flex-basis:auto}#cardLogin{padding:12px}.login-area{padding:24px 12px}}
 
+    
+        /* Design system compartilhado: login e painel */
+        :root{--brand-950:#102f2b;--brand-900:#16443c;--brand-800:#1d5a4e;--brand-700:#267562;--brand-100:#e7f2ee;--ink:#172b27;--muted:#687b76;--line:#dce7e2;--canvas:#f2f6f4;--success:#16834b;--shadow:0 18px 48px rgba(20,55,47,.10)}
+        body{min-height:100vh;display:flex;align-items:center;font-family:Inter,"Segoe UI",Arial,sans-serif;background:radial-gradient(ellipse at 12% 8%,#e4f0eb 0,transparent 38%),var(--canvas);color:var(--ink);-webkit-font-smoothing:antialiased}
+        .container{width:min(1120px,calc(100% - 40px));margin:34px auto}
+        .card{overflow:hidden;background:#fff;border:1px solid rgba(220,231,226,.95);border-radius:22px;padding:0;box-shadow:var(--shadow)}
+        .login-screen{display:grid;grid-template-columns:minmax(280px,.88fr) minmax(0,1.12fr);grid-template-rows:1fr auto;max-width:930px;min-height:590px;margin:0 auto}
+        .login-presentation{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;overflow:hidden;padding:52px 44px;background:linear-gradient(145deg,var(--brand-950),var(--brand-800));color:#fff}
+        .login-presentation:after{position:absolute;right:-100px;bottom:-145px;width:330px;height:330px;border:1px solid rgba(255,255,255,.13);border-radius:50%;box-shadow:0 0 0 35px rgba(255,255,255,.035),0 0 0 75px rgba(255,255,255,.025);content:""}
+        .brand-mark{display:grid;place-items:center;width:48px;height:48px;margin-bottom:32px;border:1px solid rgba(255,255,255,.3);border-radius:15px;background:rgba(255,255,255,.12);font-size:30px;font-weight:300}
+        .brand-mark-cross{line-height:1}
+        .login-eyebrow{color:#b9d8cd;font-size:10px;font-weight:800;letter-spacing:1.5px}
+        .login-presentation h1{margin:17px 0 14px;color:#fff;font-size:clamp(32px,4vw,43px);line-height:1.08;letter-spacing:-1.4px}
+        .login-presentation h1 strong{font-weight:800}
+        .login-presentation-text{max-width:330px;margin:0 0 30px;color:#d7e8e1;font-size:14px;line-height:1.7}
+        .login-feature{display:flex;align-items:center;gap:11px;margin:8px 0;color:#edf8f3;font-size:13px}
+        .login-feature span{display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:rgba(128,225,174,.16);color:#a8efc5;font-weight:800}
+        .login-version{margin-top:38px;color:#a8c9bd;font-size:9px;font-weight:750;letter-spacing:1.2px}
+        .login-form-area{display:flex;align-items:center;justify-content:center;padding:42px 48px}
+        .login-area{width:100%;max-width:390px;margin:0;padding:0}
+        .login-form-heading{margin-bottom:25px}
+        .form-kicker{color:var(--brand-700);font-size:10px;font-weight:800;letter-spacing:1.3px}
+        .login-form-heading h2{margin:9px 0 7px;color:var(--brand-950);font-size:26px;letter-spacing:-.7px}
+        .login-form-heading p{margin:0;color:var(--muted);font-size:13px}
+        .login-status{display:flex;align-items:center;gap:9px;margin:0 0 23px;padding:11px 13px;border:1px solid #e5ebe8;border-radius:10px;background:#f7faf8;color:#63746e;font-size:12px;font-weight:650}
+        .status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#dc6861}
+        .status-dot-offline{background:#d66b65;box-shadow:0 0 0 4px rgba(214,107,101,.12)}
+        .field-group{margin-bottom:17px}
+        .field-group>label{margin-bottom:8px;color:#344a44;font-size:12px;font-weight:750}
+        .input-shell{display:flex;align-items:center;min-height:49px;border:1px solid #cfdcd6;border-radius:11px;background:#fff;transition:border-color .18s,box-shadow .18s,background .18s}
+        .input-shell:focus-within{border-color:#389477;background:#fff;box-shadow:0 0 0 4px rgba(56,148,119,.14)}
+        .input-shell input{min-width:0;min-height:47px;margin:0;padding:12px 12px 12px 0;border:0;border-radius:11px;background:transparent;box-shadow:none;font-size:13px}
+        .input-shell input:focus{outline:none;border:0;box-shadow:none}
+        .field-icon{width:42px;flex:0 0 42px;color:#789087;text-align:center;font-size:16px}
+        .password-toggle{display:grid;place-items:center;width:42px;min-height:42px;flex:0 0 42px;margin-right:3px;padding:8px;border:0;background:transparent;color:#71857d}
+        .password-toggle:hover:not(:disabled){transform:none;background:#f0f6f3;color:var(--brand-800)}
+        .password-toggle svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+        .login-options{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0 22px}
+        .remember-option{display:flex;align-items:center;gap:8px;margin:0;color:#5d7069;font-size:11px;font-weight:600;cursor:pointer}
+        .remember-option input{width:15px;height:15px;min-height:0;margin:0;accent-color:var(--brand-800)}
+        .forgot-link{min-height:0;padding:3px 0;border:0;background:transparent;color:var(--brand-800);font-size:11px;font-weight:750}
+        .forgot-link:hover:not(:disabled){transform:none;text-decoration:underline}
+        .btn-login{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:49px;border-radius:11px;background:var(--brand-800);color:#fff;box-shadow:0 6px 15px rgba(29,90,78,.17);font-size:12px;letter-spacing:.55px}
+        .btn-login:hover:not(:disabled){background:var(--brand-950)}
+        .btn-login:disabled{opacity:.75;cursor:wait}
+        .login-spinner{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:login-spin .7s linear infinite}
+        .btn-login.is-loading .login-spinner{display:inline-block}
+        @keyframes login-spin{to{transform:rotate(360deg)}}
+        .login-security{margin:19px 0 0;color:#8a9a93;text-align:center;font-size:10px}
+        .institutional-footer{padding:17px 22px;border-top:1px solid #edf1ef;background:#fbfcfb;color:#84938d;text-align:center;font-size:10px;letter-spacing:.15px;line-height:1.5}
+        .login-footer{grid-column:1/-1}
+        .painel{display:none}
+        .painel.visivel{display:block}
+        .app-header{background:linear-gradient(120deg,var(--brand-950),var(--brand-800));color:#fff;padding:28px 34px}
+        .app-header-inner{display:flex;align-items:center;justify-content:space-between;gap:22px}
+        .app-brand{min-width:0}.app-eyebrow{display:block;margin-bottom:9px;color:#b9d8cd;font-size:10px;font-weight:750;letter-spacing:1.35px}
+        .app-brand h1{color:#fff;font-size:clamp(25px,3vw,32px)}.app-brand p{margin:7px 0 0;color:#d3e5df;font-size:14px}
+        .status-header{display:inline-flex;align-items:center;gap:9px;flex:0 0 auto;margin:0;padding:10px 14px;border:1px solid rgba(255,255,255,.2)!important;border-radius:999px;background:rgba(255,255,255,.12)!important;color:#edfff5!important;font-size:13px;white-space:nowrap}
+        .status-header .status-dot{background:#69e39a;box-shadow:0 0 0 4px rgba(105,227,154,.14)}
+        .painel-conteudo{display:grid;gap:18px;padding:26px}
+        .exportacao{min-width:0;padding:24px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 3px 12px rgba(24,57,48,.035)}
+        .titulo-painel{display:flex;align-items:center;gap:10px;margin:0 0 20px;color:var(--brand-900);font-size:18px;font-weight:750;letter-spacing:-.25px}
+        .exportacao label{display:block;margin-bottom:8px;color:#344a44;font-size:13px;font-weight:700}
+        .exportacao input{width:100%;min-height:46px;margin:0 0 16px;padding:12px 14px;border:1px solid #cfdcd6;border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:14px;transition:border-color .18s,box-shadow .18s}
+        .exportacao input:focus{outline:none;border-color:#389477;box-shadow:0 0 0 4px rgba(56,148,119,.13)}
+        .exportacao button{min-height:44px;border:1px solid transparent;border-radius:10px;padding:11px 17px;font:inherit;font-size:13px;font-weight:750;letter-spacing:.2px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s,opacity .15s}
+        .exportacao button:hover:not(:disabled){transform:translateY(-1px)}
+        .exportacao button:active:not(:disabled){transform:translateY(0)}
+        button:focus-visible{outline:3px solid rgba(45,143,111,.35);outline-offset:3px}
+        .btn-exportar{background:var(--brand-800);color:#fff;box-shadow:0 4px 10px rgba(29,90,78,.12)}
+        .btn-exportar:hover:not(:disabled){background:var(--brand-950)}
+        .btn-exportar:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+        .datas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+        .mensagem{margin-top:14px;padding:12px 14px;border:1px solid transparent;border-radius:10px;font-size:13px;line-height:1.5}
+        .mensagem.sucesso{display:block;background:#eaf7ef;color:#17683c;border-color:#d1ecda}.mensagem.erro{display:block;background:#fff0ef;color:#a12b26;border-color:#f4d2cf}
+        .oculto{display:none!important}
+        .consulta-cns input{margin-bottom:14px}.acoes-consulta-cns{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px}
+        .acoes-consulta-cns button{flex:1 1 190px;margin-top:0}
+        .btn-copiar-cns{background:#eaf3ef!important;color:var(--brand-900)!important;border-color:#cfe1d8!important;box-shadow:none!important}
+        .btn-copiar-cns:hover:not(:disabled){background:#dcece5!important}.btn-copiar-cns:disabled{opacity:.5;cursor:not-allowed}
+        .resumo-paciente-cns{margin-top:17px;padding:20px;border:1px solid #d5e6dc;border-left:4px solid var(--success);border-radius:13px;background:#f8fcf9}
+        .resumo-paciente-cns .linha-principal{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .resumo-paciente-cns .nome-paciente{color:#183a30;font-size:18px;font-weight:750;overflow-wrap:anywhere}
+        .resumo-paciente-cns .cartao-sus{color:#16834b;font-size:13px;font-weight:750;white-space:nowrap}
+        .resumo-paciente-cns .nome-mae{display:block;margin-top:8px;color:#71817b;font-size:13px}
+        .resultado-cns{margin-top:16px;padding:16px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--line);border-radius:10px;background:#f7faf8;color:#344a44;font:13px/1.5 Consolas,"Courier New",monospace}
+        @media(max-width:760px){body{align-items:flex-start}.container{width:min(calc(100% - 24px),620px);margin:12px auto}.login-screen{grid-template-columns:1fr;min-height:0}.login-presentation{padding:28px 25px}.brand-mark{width:40px;height:40px;margin-bottom:18px}.login-presentation h1{margin:12px 0;font-size:32px}.login-presentation-text{margin-bottom:15px}.login-feature{display:none}.login-version{margin-top:18px}.login-form-area{padding:30px 25px}.login-footer{grid-column:1}.app-header{padding:23px 20px}.app-header-inner{align-items:flex-start;flex-direction:column;gap:16px}.status-header{align-self:flex-start}.painel-conteudo{padding:15px;gap:14px}.exportacao{padding:18px;border-radius:14px}.datas{grid-template-columns:1fr;gap:0}.acoes-consulta-cns{flex-direction:column}.acoes-consulta-cns button{width:100%;flex-basis:auto}}
+        @media(max-width:420px){.container{width:calc(100% - 16px);margin:8px auto}.login-form-area{padding:26px 18px}.login-options{align-items:flex-start;flex-direction:column}.app-brand h1{font-size:25px}.institutional-footer{padding:14px 16px;font-size:9px}}
+        @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
     </style>
 </head>
 
@@ -309,30 +399,59 @@
 
 <div class="container">
 
-    <!-- FORMULÁRIO DE LOGIN -->
-    <div class="card" id="cardLogin">
-        <form class="login-area" id="formLogin" action="javascript:void(0);">
-            <h1>Automação SISREG</h1>
-            <div class="subtitulo">Acesso ao sistema</div>
-            <div style="font-size: 13px; color: #9ca3af; margin-top: -20px; margin-bottom: 24px;">
-                Versão 1.6
-            </div>
-
-            <div class="status" id="status">
-                🔴 SISREG desconectado
-            </div>
-
-            <label for="usuario">Usuário</label>
-            <input type="text" id="usuario" name="username" autocomplete="username" placeholder="Digite seu usuário" required>
-
-            <label for="senha">Senha</label>
-            <input type="password" id="senha" name="password" autocomplete="current-password" placeholder="Digite sua senha" required>
-
-            <button type="submit" class="btn-login" id="btnLogin">
-                ENTRAR NO SISREG
-            </button>
-        </form>
-    </div>
+    <!-- TELA DE LOGIN -->
+    <section class="card login-screen" id="cardLogin" aria-labelledby="tituloLogin">
+        <div class="login-presentation">
+            <div class="brand-mark" aria-hidden="true"><span class="brand-mark-cross">+</span></div>
+            <span class="login-eyebrow">COMPLEXO PEDIÁTRICO ARLINDA MARQUES</span>
+            <h1>Automação<br><strong>SISREG</strong></h1>
+            <p class="login-presentation-text">Acesso integrado às ferramentas de consulta de pacientes e exportação de agendas.</p>
+            <div class="login-feature"><span aria-hidden="true">✓</span> Consulta por CNS e CPF</div>
+            <div class="login-feature"><span aria-hidden="true">✓</span> Exportação de agendas em CSV</div>
+            <div class="login-feature"><span aria-hidden="true">✓</span> Fluxo de trabalho simplificado</div>
+            <div class="login-version">AMBIENTE INSTITUCIONAL · VERSÃO 1.6</div>
+        </div>
+        <div class="login-form-area">
+            <form class="login-area" id="formLogin" action="javascript:void(0);" novalidate>
+                <div class="login-form-heading">
+                    <span class="form-kicker">ÁREA RESTRITA</span>
+                    <h2 id="tituloLogin">Acesse sua conta</h2>
+                    <p>Informe suas credenciais para continuar.</p>
+                </div>
+                <div class="status login-status" id="status" role="status" aria-live="polite">
+                    <span class="status-dot status-dot-offline" aria-hidden="true"></span>
+                    SISREG desconectado
+                </div>
+                <div class="field-group">
+                    <label for="usuario">Usuário ou CPF</label>
+                    <div class="input-shell">
+                        <span class="field-icon" aria-hidden="true">▣</span>
+                        <input type="text" id="usuario" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Digite seu usuário ou CPF" required>
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="senha">Senha</label>
+                    <div class="input-shell password-shell">
+                        <span class="field-icon" aria-hidden="true">▤</span>
+                        <input type="password" id="senha" name="password" autocomplete="current-password" placeholder="Digite sua senha" required>
+                        <button class="password-toggle" id="btnMostrarSenha" type="button" aria-label="Exibir senha" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="login-options">
+                    <label class="remember-option" for="lembrarAcesso"><input type="checkbox" id="lembrarAcesso"> <span>Lembrar meu acesso</span></label>
+                    <button class="forgot-link" id="btnEsqueciSenha" type="button">Esqueceu a senha?</button>
+                </div>
+                <button type="submit" class="btn-login" id="btnLogin">
+                    <span class="login-button-label">ENTRAR NO SISREG</span>
+                    <span class="login-spinner" aria-hidden="true"></span>
+                </button>
+                <p class="login-security"><span aria-hidden="true">▣</span> Acesso restrito a usuários autorizados.</p>
+            </form>
+        </div>
+        <footer class="institutional-footer login-footer">Complexo Pediátrico Arlinda Marques <span aria-hidden="true">—</span> Setor de Tecnologia da Informação</footer>
+    </section>
 
     <!-- PAINEL -->
     <div class="card painel" id="painel">
@@ -352,8 +471,8 @@
         <main class="painel-conteudo">
 
         <!-- CONSULTA POR CNS / CPF (MÓDULO ADICIONAL) -->
-        <div class="exportacao consulta-cns" id="secaoConsultaCNS" style="margin-top: 18px;">
-            <div class="titulo-painel">🔎 Consulta por CNS / CPF</div>
+        <section class="exportacao consulta-cns" id="secaoConsultaCNS" aria-labelledby="tituloConsultaCNS">
+            <h2 class="titulo-painel" id="tituloConsultaCNS">🔎 Consulta por CNS / CPF</h2>
             <label for="numeroConsultaCNS">Cartão Nacional de Saúde (CNS) ou CPF</label>
             <input type="text" id="numeroConsultaCNS" inputmode="numeric" autocomplete="off"
                 maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
@@ -370,30 +489,11 @@
                 <span id="nomeMaeCNS" class="nome-mae"></span>
             </div>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
-        </div>
-
-        <!-- PASTA DE DESTINO -->
-        <div class="exportacao" style="margin-bottom: 18px;">
-            <div class="titulo-painel">
-                📁 Pasta de destino do CSV
-            </div>
-
-            <button class="btn-exportar" id="btnSelecionarPasta" type="button">
-                SELECIONAR PASTA
-            </button>
-
-            <div class="mensagem" id="statusPasta" style="display: block; margin-top: 12px;">
-                ⚠️ Nenhuma pasta configurada.
-            </div>
-        </div>
-
-        
+        </section>
 
         <!-- EXPORTAÇÃO -->
-        <div class="exportacao">
-            <div class="titulo-painel">
-                📅 Exportação de Agenda
-            </div>
+        <section class="exportacao">
+            <h2 class="titulo-painel">📅 Exportação de Agenda</h2>
 
             <div class="datas">
                 <div>
@@ -415,7 +515,24 @@
         </div>
 
         
+
+        <!-- PASTA DE DESTINO -->
+        <section class="exportacao folder-card">
+            <div class="titulo-painel">
+                📁 Pasta de destino do CSV
+            </div>
+
+            <button class="btn-exportar" id="btnSelecionarPasta" type="button">
+                SELECIONAR PASTA
+            </button>
+
+            <div class="mensagem" id="statusPasta" style="display: block; margin-top: 12px;">
+                ⚠️ Nenhuma pasta configurada.
+            </div>
+        </section>
+
         </main>
+        <footer class="institutional-footer">Complexo Pediátrico Arlinda Marques <span aria-hidden="true">—</span> Setor de Tecnologia da Informação</footer>
     </div>
 
 </div>
@@ -463,7 +580,14 @@ INICIALIZAÇÃO E TECLA ENTER
 */
 document.addEventListener("DOMContentLoaded", async function () {
     carregarDatasPadrao();
-    if (usuario) usuario.focus();
+    const usuarioSalvo = localStorage.getItem("sisreg_usuario_lembrado");
+    if (usuarioSalvo) {
+        usuario.value = usuarioSalvo;
+        document.getElementById("lembrarAcesso").checked = true;
+        senha.focus();
+    } else if (usuario) {
+        usuario.focus();
+    }
     await inicializarPastaSISREG();
 });
 
@@ -722,14 +846,24 @@ formLogin.addEventListener("submit", function (event) {
     const pass = senha.value;
 
     if (!user || !pass) {
-        status.textContent = "⚠️ Informe usuário e senha.";
-        status.className = "status erro";
+        status.innerHTML = '<span class="status-dot status-dot-offline" aria-hidden="true"></span> Informe usuário e senha.';
+        status.className = "status login-status erro";
+        (!user ? usuario : senha).focus();
         return;
     }
 
-    status.textContent = "🟡 Conectando ao SISREG...";
-    status.className = "status";
+    const lembrar = document.getElementById("lembrarAcesso").checked;
+    if (lembrar) {
+        localStorage.setItem("sisreg_usuario_lembrado", user);
+    } else {
+        localStorage.removeItem("sisreg_usuario_lembrado");
+    }
+
+    status.innerHTML = '<span class="status-dot" style="background:#d9b45d" aria-hidden="true"></span> Conectando ao SISREG...';
+    status.className = "status login-status";
     btnLogin.disabled = true;
+    btnLogin.classList.add("is-loading");
+    btnLogin.querySelector(".login-button-label").textContent = "CONECTANDO...";
 
     window.postMessage({
         type: "SISREG_LOGIN",
@@ -747,15 +881,20 @@ window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
 
     if (event.data.type === "LOGIN_SISREG_SUCESSO") {
+        btnLogin.disabled = false;
+        btnLogin.classList.remove("is-loading");
+        btnLogin.querySelector(".login-button-label").textContent = "ENTRAR NO SISREG";
         cardLogin.classList.add("oculto");
         painel.classList.add("visivel");
         return;
     }
 
     if (event.data.type === "LOGIN_SISREG_ERRO") {
-        status.textContent = "✕ " + (event.data.mensagem || "Login ou senha incorreto(s).");
-        status.className = "status erro";
+        status.innerHTML = '<span class="status-dot status-dot-offline" aria-hidden="true"></span> ' + (event.data.mensagem || "Login ou senha incorreto(s).");
+        status.className = "status login-status erro";
         btnLogin.disabled = false;
+        btnLogin.classList.remove("is-loading");
+        btnLogin.querySelector(".login-button-label").textContent = "ENTRAR NO SISREG";
         return;
     }
 
@@ -1020,6 +1159,22 @@ window.addEventListener("message", function (event) {
         btnConsultarCNS.textContent = "CONSULTAR DADOS";
         exibirMensagemConsultaCNS("✕ " + (event.data.mensagem || "Não foi possível concluir a consulta."), "erro");
     }
+});
+
+
+/* Microinterações e preferências da tela de login */
+document.getElementById("btnMostrarSenha").addEventListener("click", function () {
+    const mostrar = senha.type === "password";
+    senha.type = mostrar ? "text" : "password";
+    this.setAttribute("aria-label", mostrar ? "Ocultar senha" : "Exibir senha");
+    this.setAttribute("aria-pressed", String(mostrar));
+    this.innerHTML = mostrar
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+});
+document.getElementById("btnEsqueciSenha").addEventListener("click", function () {
+    status.textContent = "A redefinição de senha é realizada pelo suporte/administrador do SISREG. Entre em contato com o responsável pelo seu acesso.";
+    status.className = "status login-status erro";
 });
 
 </script>
