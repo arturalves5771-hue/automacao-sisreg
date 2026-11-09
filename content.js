@@ -261,7 +261,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 });
 
                 if (!opcaoCNS) throw new Error("Não localizei a opção CNS no menu do SISREG.");
-                chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
+                await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
                 opcaoCNS.click();
                 campo = await aguardarElementoCNS('input[name="nu_cns"]', 15000);
             }
