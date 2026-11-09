@@ -292,6 +292,7 @@
             <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
             <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
+            <button class="btn-exportar oculto" id="btnCopiarDadosCNS" type="button" style="margin-top: 12px;">📋 COPIAR INFORMAÇÕES</button>
         </div>
     </div>
 
@@ -321,6 +322,7 @@ const numeroConsultaCNS = document.getElementById("numeroConsultaCNS");
 const btnConsultarCNS = document.getElementById("btnConsultarCNS");
 const mensagemConsultaCNS = document.getElementById("mensagemConsultaCNS");
 const resultadoConsultaCNS = document.getElementById("resultadoConsultaCNS");
+const btnCopiarDadosCNS = document.getElementById("btnCopiarDadosCNS");
 
 let pastaSISREG = null;
 const DB_NOME = "AutomacaoSISREG";
@@ -740,6 +742,22 @@ function exibirMensagemConsultaCNS(texto, tipo) {
     mensagemConsultaCNS.className = "mensagem " + (tipo || "");
 }
 
+btnCopiarDadosCNS.addEventListener("click", async function () {
+    const texto = resultadoConsultaCNS.textContent;
+
+    if (!texto.trim()) {
+        exibirMensagemConsultaCNS("Não há informações para copiar.", "erro");
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(texto);
+        exibirMensagemConsultaCNS("✅ Informações copiadas. Agora é só colar onde precisar.", "sucesso");
+    } catch (erro) {
+        exibirMensagemConsultaCNS("❌ O navegador não permitiu copiar. Selecione o texto do resultado e use Ctrl+C.", "erro");
+    }
+});
+
 btnConsultarCNS.addEventListener("click", function () {
     const numero = numeroConsultaCNS.value.replace(/\D/g, "");
 
@@ -755,6 +773,7 @@ btnConsultarCNS.addEventListener("click", function () {
 
     resultadoConsultaCNS.textContent = "";
     resultadoConsultaCNS.classList.add("oculto");
+    btnCopiarDadosCNS.classList.add("oculto");
     btnConsultarCNS.disabled = true;
     btnConsultarCNS.textContent = "CONSULTANDO...";
     exibirMensagemConsultaCNS("⏳ Abrindo o SISREG e realizando a consulta. Aguarde...", "sucesso");
@@ -777,6 +796,7 @@ window.addEventListener("message", function (event) {
         const dados = event.data.jsonData;
         resultadoConsultaCNS.textContent = JSON.stringify(dados, null, 2);
         resultadoConsultaCNS.classList.remove("oculto");
+        btnCopiarDadosCNS.classList.remove("oculto");
         return;
     }
 
