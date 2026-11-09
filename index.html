@@ -172,6 +172,31 @@
             display: none !important;
         }
 
+
+        /* Estilos isolados da consulta CNS/CPF */
+        .consulta-cns input {
+            margin-bottom: 12px;
+        }
+
+        .consulta-cns .btn-exportar:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .resultado-cns {
+            margin-top: 16px;
+            padding: 16px;
+            max-height: 420px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+            color: #1f2937;
+            font: 13px/1.5 Consolas, "Courier New", monospace;
+        }
+
         @media (max-width: 600px) {
             .datas {
                 grid-template-columns: 1fr;
@@ -257,6 +282,17 @@
 
             <div class="mensagem" id="mensagem"></div>
         </div>
+
+        <!-- CONSULTA POR CNS / CPF (MÓDULO ADICIONAL) -->
+        <div class="exportacao consulta-cns" id="secaoConsultaCNS" style="margin-top: 18px;">
+            <div class="titulo-painel">🔎 Consulta por CNS / CPF</div>
+            <label for="numeroConsultaCNS">Cartão Nacional de Saúde (CNS) ou CPF</label>
+            <input type="text" id="numeroConsultaCNS" inputmode="numeric" autocomplete="off"
+                maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
+            <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
+            <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
+            <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
+        </div>
     </div>
 
 </div>
@@ -280,6 +316,11 @@ const btnExportar = document.getElementById("btnExportar");
 const mensagem = document.getElementById("mensagem");
 const btnSelecionarPasta = document.getElementById("btnSelecionarPasta");
 const statusPasta = document.getElementById("statusPasta");
+/* Elementos exclusivos da consulta CNS/CPF */
+const numeroConsultaCNS = document.getElementById("numeroConsultaCNS");
+const btnConsultarCNS = document.getElementById("btnConsultarCNS");
+const mensagemConsultaCNS = document.getElementById("mensagemConsultaCNS");
+const resultadoConsultaCNS = document.getElementById("resultadoConsultaCNS");
 
 let pastaSISREG = null;
 const DB_NOME = "AutomacaoSISREG";
@@ -672,6 +713,80 @@ btnExportar.addEventListener("click", async function () {
         dataFinal: dataFinalSISREG
     }, "*");
 });
+
+/*
+=========================================================
+MÓDULO ADICIONAL: CONSULTA POR CNS / CPF
+=========================================================
+*/
+function validarCPFConsulta(cpf) {
+    if (!/^\\d{11}$/.test(cpf) || /^(\\d)\\1{10}$/.test(cpf)) return false;
+
+    let soma = 0;
+    for (let i = 0; i < 9; i++) soma += Number(cpf[i]) * (10 - i);
+    let digito = (soma * 10) % 11;
+    if (digito === 10) digito = 0;
+    if (digito !== Number(cpf[9])) return false;
+
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += Number(cpf[i]) * (11 - i);
+    digito = (soma * 10) % 11;
+    if (digito === 10) digito = 0;
+    return digito === Number(cpf[10]);
+}
+
+function exibirMensagemConsultaCNS(texto, tipo) {
+    mensagemConsultaCNS.textContent = texto;
+    mensagemConsultaCNS.className = "mensagem " + (tipo || "");
+}
+
+btnConsultarCNS.addEventListener("click", function () {
+    const numero = numeroConsultaCNS.value.replace(/\\D/g, "");
+
+    if (numero.length !== 15 && numero.length !== 11) {
+        exibirMensagemConsultaCNS("Informe um CNS com 15 dígitos ou um CPF com 11 dígitos.", "erro");
+        return;
+    }
+
+    if (numero.length === 11 && !validarCPFConsulta(numero)) {
+        exibirMensagemConsultaCNS("O CPF informado não é válido. Confira os números.", "erro");
+        return;
+    }
+
+    resultadoConsultaCNS.textContent = "";
+    resultadoConsultaCNS.classList.add("oculto");
+    btnConsultarCNS.disabled = true;
+    btnConsultarCNS.textContent = "CONSULTANDO...";
+    exibirMensagemConsultaCNS("⏳ Abrindo o SISREG e realizando a consulta. Aguarde...", "sucesso");
+
+    window.postMessage({
+        type: "CONSULTAR_DADOS_CNS",
+        numero: numero
+    }, "*");
+});
+
+/* Canal independente: não interfere no listener já utilizado pelo CSV/login. */
+window.addEventListener("message", function (event) {
+    if (event.source !== window || !event.data) return;
+
+    if (event.data.type === "DADOS_CNS_SUCESSO") {
+        btnConsultarCNS.disabled = false;
+        btnConsultarCNS.textContent = "CONSULTAR DADOS";
+        exibirMensagemConsultaCNS("✅ Consulta concluída. Confira os dados abaixo.", "sucesso");
+
+        const dados = event.data.jsonData;
+        resultadoConsultaCNS.textContent = JSON.stringify(dados, null, 2);
+        resultadoConsultaCNS.classList.remove("oculto");
+        return;
+    }
+
+    if (event.data.type === "CONSULTA_CNS_ERRO") {
+        btnConsultarCNS.disabled = false;
+        btnConsultarCNS.textContent = "CONSULTAR DADOS";
+        exibirMensagemConsultaCNS("✕ " + (event.data.mensagem || "Não foi possível concluir a consulta."), "erro");
+    }
+});
+
 </script>
 
 </body>
