@@ -197,11 +197,53 @@ if (location.hostname === "sisregiii.saude.gov.br") {
     CONSULTA ISOLADA POR CNS / CPF
     -----------------------------------------------------
     */
+    /*
+    -----------------------------------------------------
+    CONSULTA CNS / CPF — SUPORTE À ESTRUTURA EM FRAMES
+    -----------------------------------------------------
+    O SISREG pode carregar o menu e o CADWEB em frames.
+    Por isso, a busca percorre o documento principal e
+    os frames acessíveis da mesma origem.
+    */
+    function percorrerDocumentos(callback, documento, visitados) {
+        documento = documento || document;
+        visitados = visitados || new Set();
+
+        if (!documento || visitados.has(documento)) return null;
+        visitados.add(documento);
+
+        try {
+            const encontrado = callback(documento);
+            if (encontrado) return encontrado;
+
+            const frames = documento.querySelectorAll("iframe, frame");
+            for (const frame of frames) {
+                try {
+                    const interno = frame.contentDocument;
+                    const resultado = percorrerDocumentos(callback, interno, visitados);
+                    if (resultado) return resultado;
+                } catch (erro) {
+                    // Frames de outra origem não podem ser acessados.
+                }
+            }
+        } catch (erro) {
+            // Continua procurando nos demais documentos acessíveis.
+        }
+
+        return null;
+    }
+
+    function buscarElementoSISREG(seletor) {
+        return percorrerDocumentos(function (doc) {
+            return doc.querySelector(seletor);
+        });
+    }
+
     function aguardarElementoCNS(seletor, tempoMaximo) {
         return new Promise(function (resolve, reject) {
             const inicio = Date.now();
             const timer = setInterval(function () {
-                const elemento = document.querySelector(seletor);
+                const elemento = buscarElementoSISREG(seletor);
                 if (elemento) {
                     clearInterval(timer);
                     resolve(elemento);
@@ -209,15 +251,25 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 }
                 if (Date.now() - inicio >= tempoMaximo) {
                     clearInterval(timer);
-                    reject(new Error("O campo de consulta CNS não apareceu no SISREG."));
+                    reject(new Error("Não encontrei input[name='nu_cns'] na página principal nem nos frames do SISREG."));
                 }
             }, 300);
         });
     }
 
-    function extrairDadosPaginaCNS() {
+    function localizarDocumentoResultado() {
+        return percorrerDocumentos(function (doc) {
+            const texto = doc.body ? doc.body.innerText : "";
+            if (/CONSULTA AO CADASTRO DE PACIENTES SUS/i.test(texto)) return doc;
+            return null;
+        });
+    }
+
+    function extrairDadosPaginaCNS(documento) {
+        const doc = documento || localizarDocumentoResultado() || document;
         const campos = [];
-        document.querySelectorAll("input:not([type='password']):not([type='hidden']), select, textarea").forEach(function (campo) {
+
+        doc.querySelectorAll("input:not([type='password']):not([type='hidden']), select, textarea").forEach(function (campo) {
             const rotulo = campo.labels && campo.labels.length
                 ? campo.labels[0].innerText.trim()
                 : (campo.name || campo.id || campo.getAttribute("aria-label") || "");
@@ -228,7 +280,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         });
 
         const tabelas = [];
-        document.querySelectorAll("table").forEach(function (tabela) {
+        doc.querySelectorAll("table").forEach(function (tabela) {
             const linhas = [];
             tabela.querySelectorAll("tr").forEach(function (linha) {
                 const celulas = Array.from(linha.querySelectorAll("th, td"))
@@ -239,63 +291,86 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         });
 
         return {
-            url: location.href,
-            titulo: document.title,
+            url: doc.location ? doc.location.href : location.href,
+            titulo: doc.title || document.title,
             campos: campos,
             tabelas: tabelas,
-            texto: document.body ? document.body.innerText.trim() : ""
+            texto: doc.body ? doc.body.innerText.trim() : ""
         };
+    }
+
+    let consultaCNSResultadoEnviado = false;
+
+    function enviarResultadoCNS(documento) {
+        if (consultaCNSResultadoEnviado) return;
+        consultaCNSResultadoEnviado = true;
+
+        chrome.runtime.sendMessage({
+            type: "DADOS_CNS_SUCESSO",
+            jsonData: extrairDadosPaginaCNS(documento)
+        });
     }
 
     async function executarConsultaCNS(numero) {
         try {
-            let campo = document.querySelector('input[name="nu_cns"]');
+            let campo = buscarElementoSISREG('input[name="nu_cns"]');
 
-            /* Se ainda não estiver na tela de consulta, aciona a opção CNS do menu. */
+            /* Se necessário, abre a opção CNS, inclusive quando estiver em um frame. */
             if (!campo) {
-                const opcoes = Array.from(document.querySelectorAll("a, button, input[type='button'], input[type='submit']"));
-                const opcaoCNS = opcoes.find(function (elemento) {
-                    const texto = (elemento.innerText || elemento.value || elemento.getAttribute("title") || "").trim();
-                    const alvo = (elemento.getAttribute("href") || "") + " " + (elemento.getAttribute("onclick") || "");
-                    return /\bCNS\b/i.test(texto) || /cns/i.test(alvo);
+                const opcaoCNS = percorrerDocumentos(function (doc) {
+                    const opcoes = Array.from(doc.querySelectorAll("a, button, input[type='button'], input[type='submit']"));
+                    return opcoes.find(function (elemento) {
+                        const texto = (elemento.innerText || elemento.value || elemento.getAttribute("title") || "").trim();
+                        const alvo = (elemento.getAttribute("href") || "") + " " + (elemento.getAttribute("onclick") || "");
+                        return /\bCNS\b/i.test(texto) || /cns/i.test(alvo);
+                    });
                 });
 
-                if (!opcaoCNS) throw new Error("Não localizei a opção CNS no menu do SISREG.");
+                if (!opcaoCNS) {
+                    throw new Error("Não localizei a opção CNS no menu do SISREG, nem na página principal nem nos frames.");
+                }
+
                 await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
                 opcaoCNS.click();
-                campo = await aguardarElementoCNS('input[name="nu_cns"]', 15000);
+                campo = await aguardarElementoCNS('input[name="nu_cns"]', 20000);
             }
 
+            const docConsulta = campo.ownerDocument;
             campo.focus();
             campo.value = numero;
             campo.dispatchEvent(new Event("input", { bubbles: true }));
             campo.dispatchEvent(new Event("change", { bubbles: true }));
 
-            const formulario = campo.form;
-            if (!formulario) throw new Error("O campo nu_cns não está vinculado a um formulário.");
-
-            await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
-
-            const botaoEnviar = formulario.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
-            if (botaoEnviar) {
-                botaoEnviar.click();
-            } else if (formulario.requestSubmit) {
-                formulario.requestSubmit();
-            } else {
-                formulario.submit();
+            /* Usa exatamente o botão Pesquisar informado no HTML do CADWEB. */
+            const botaoPesquisar = docConsulta.querySelector('input[name="btn_pesquisar"]');
+            if (!botaoPesquisar) {
+                throw new Error("Encontrei o campo nu_cns, mas não encontrei input[name='btn_pesquisar'] na mesma tela.");
             }
 
-            /* Em consultas sem recarregamento, captura o resultado neste mesmo documento. */
-            setTimeout(function () {
-                if (document.querySelector('input[name="nu_cns"]')) {
-                    const resultado = extrairDadosPaginaCNS();
+            await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
+            botaoPesquisar.click();
+
+            /* Aguarda o resultado real, inclusive quando a pesquisa ocorre por JavaScript/AJAX. */
+            const inicio = Date.now();
+            const timer = setInterval(function () {
+                const docResultado = localizarDocumentoResultado();
+                if (docResultado) {
+                    clearInterval(timer);
+                    enviarResultadoCNS(docResultado);
+                    return;
+                }
+
+                if (Date.now() - inicio >= 25000) {
+                    clearInterval(timer);
+                    const texto = docConsulta.body ? docConsulta.body.innerText.trim().slice(0, 500) : "";
                     chrome.runtime.sendMessage({
-                        type: "DADOS_CNS_SUCESSO",
-                        jsonData: resultado
+                        type: "CONSULTA_CNS_ERRO",
+                        mensagem: texto
+                            ? "O botão Pesquisar foi acionado, mas o resultado do CADWEB não apareceu. Trecho da tela: " + texto
+                            : "O botão Pesquisar foi acionado, mas o SISREG não apresentou o resultado dentro do tempo esperado."
                     });
                 }
-            }, 3500);
-
+            }, 500);
         } catch (erro) {
             chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_ERRO",
@@ -306,15 +381,14 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
     chrome.runtime.onMessage.addListener(function (message) {
         if (message.type === "EXECUTAR_CONSULTA_CNS") {
+            consultaCNSResultadoEnviado = false;
             executarConsultaCNS(message.numero);
             return;
         }
 
         if (message.type === "CAPTURAR_RESULTADO_CNS") {
-            chrome.runtime.sendMessage({
-                type: "DADOS_CNS_SUCESSO",
-                jsonData: extrairDadosPaginaCNS()
-            });
+            const docResultado = localizarDocumentoResultado();
+            enviarResultadoCNS(docResultado || document);
         }
     });
 
