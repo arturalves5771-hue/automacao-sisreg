@@ -274,7 +274,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             const formulario = campo.form;
             if (!formulario) throw new Error("O campo nu_cns não está vinculado a um formulário.");
 
-            chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
+            await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
 
             const botaoEnviar = formulario.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
             if (botaoEnviar) {
