@@ -19,12 +19,38 @@ window.addEventListener("message", function (event) {
     }
 
     if (event.data.type === "SISREG_LOGIN") {
-        if (!event.data.username || !event.data.password) return;
-        chrome.runtime.sendMessage({
-            type: "INICIAR_LOGIN_SISREG",
-            username: event.data.username,
-            password: event.data.password
-        });
+        if (!event.data.username || !event.data.password) {
+            window.postMessage({
+                type: "LOGIN_SISREG_ERRO",
+                mensagem: "Informe usuário e senha."
+            }, "*");
+            return;
+        }
+
+        console.log("LOGIN SISREG: solicitação recebida pelo content.js");
+
+        try {
+            chrome.runtime.sendMessage({
+                type: "INICIAR_LOGIN_SISREG",
+                username: event.data.username,
+                password: event.data.password
+            }, function () {
+                const erro = chrome.runtime.lastError;
+                if (erro) {
+                    console.error("LOGIN SISREG: erro ao comunicar com background", erro.message);
+                    window.postMessage({
+                        type: "LOGIN_SISREG_ERRO",
+                        mensagem: "A extensão não conseguiu se comunicar com o serviço em segundo plano. Recarregue a extensão no Chrome."
+                    }, "*");
+                }
+            });
+        } catch (erro) {
+            console.error("LOGIN SISREG: erro no content.js", erro);
+            window.postMessage({
+                type: "LOGIN_SISREG_ERRO",
+                mensagem: "Falha na comunicação com a extensão: " + (erro.message || erro)
+            }, "*");
+        }
         return;
     }
 
