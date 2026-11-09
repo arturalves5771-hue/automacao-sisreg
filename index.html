@@ -890,7 +890,7 @@ window.addEventListener("message", function (event) {
     }
 
     if (event.data.type === "LOGIN_SISREG_ERRO") {
-        status.innerHTML = '<span class="status-dot status-dot-offline" aria-hidden="true"></span> ' + (event.data.mensagem || "Login ou senha incorreto(s).");
+        status.textContent = "✕ " + (event.data.mensagem || "Login ou senha incorreto(s).");
         status.className = "status login-status erro";
         btnLogin.disabled = false;
         btnLogin.classList.remove("is-loading");
@@ -1174,7 +1174,7 @@ document.getElementById("btnMostrarSenha").addEventListener("click", function ()
 });
 document.getElementById("btnEsqueciSenha").addEventListener("click", function () {
     status.textContent = "A redefinição de senha é realizada pelo suporte/administrador do SISREG. Entre em contato com o responsável pelo seu acesso.";
-    status.className = "status login-status erro";
+    status.className = "status login-status";
 });
 
 </script>
