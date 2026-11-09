@@ -50,44 +50,22 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     =================================================
     */
     if (message.type === "INICIAR_LOGIN_SISREG") {
-        console.log("LOGIN SISREG: solicitação recebida pelo background");
-
         if (sender.tab) abaNossaPagina = sender.tab.id;
 
-        try {
-            if (!message.username || !message.password) {
-                throw new Error("Usuário ou senha não foram recebidos pela extensão.");
-            }
+        await chrome.storage.session.set({
+            loginSISREG: { username: message.username, password: message.password },
+            operacaoAtual: "login",
+            tentativaEnviada: false,
+            abaNossaPagina: abaNossaPagina
+        });
 
-            await chrome.storage.session.set({
-                loginSISREG: { username: message.username, password: message.password },
-                operacaoAtual: "login",
-                tentativaEnviada: false,
-                abaNossaPagina: abaNossaPagina
-            });
+        const tab = await chrome.tabs.create({
+            url: "https://sisregiii.saude.gov.br/cgi-bin/index",
+            active: false
+        });
 
-            const tab = await chrome.tabs.create({
-                url: "https://sisregiii.saude.gov.br/cgi-bin/index",
-                active: false
-            });
-
-            abaSISREG = tab.id;
-            await chrome.storage.session.set({ abaSISREG: tab.id });
-            console.log("LOGIN SISREG: aba criada", tab.id);
-        } catch (erro) {
-            console.error("LOGIN SISREG: falha ao iniciar", erro);
-
-            if (sender.tab?.id) {
-                try {
-                    await chrome.tabs.sendMessage(sender.tab.id, {
-                        type: "LOGIN_SISREG_ERRO",
-                        mensagem: "Não foi possível abrir o SISREG: " + (erro.message || erro)
-                    });
-                } catch (erroEnvio) {
-                    console.error("LOGIN SISREG: não foi possível avisar a página", erroEnvio);
-                }
-            }
-        }
+        abaSISREG = tab.id;
+        await chrome.storage.session.set({ abaSISREG: tab.id });
         return;
     }
 
