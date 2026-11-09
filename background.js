@@ -142,17 +142,6 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             }
 
             if (message.telaLogin === false) {
-                if (dados.consultaCNSAguardandoNavegacao) {
-                    await chrome.storage.session.set({ consultaCNSAguardandoNavegacao: false, consultaCNSIniciada: true });
-                    try {
-                        await chrome.tabs.sendMessage(tabId, {
-                            type: "EXECUTAR_CONSULTA_CNS",
-                            numero: dados.consultaCNS?.numero
-                        });
-                    } catch (e) {}
-                    return;
-                }
-
                 if (!dados.consultaCNSIniciada) {
                     await chrome.storage.session.set({ consultaCNSIniciada: true });
                     try {
