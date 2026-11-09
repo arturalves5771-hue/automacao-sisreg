@@ -215,7 +215,7 @@
             <h1>Automação SISREG</h1>
             <div class="subtitulo">Acesso ao sistema</div>
             <div style="font-size: 13px; color: #9ca3af; margin-top: -20px; margin-bottom: 24px;">
-                Versão 1.6
+                Versão 1.7
             </div>
 
             <div class="status" id="status">
@@ -720,7 +720,7 @@ MÓDULO ADICIONAL: CONSULTA POR CNS / CPF
 =========================================================
 */
 function validarCPFConsulta(cpf) {
-    if (!/^\\d{11}$/.test(cpf) || /^(\\d)\\1{10}$/.test(cpf)) return false;
+    if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
 
     let soma = 0;
     for (let i = 0; i < 9; i++) soma += Number(cpf[i]) * (10 - i);
@@ -741,7 +741,7 @@ function exibirMensagemConsultaCNS(texto, tipo) {
 }
 
 btnConsultarCNS.addEventListener("click", function () {
-    const numero = numeroConsultaCNS.value.replace(/\\D/g, "");
+    const numero = numeroConsultaCNS.value.replace(/\D/g, "");
 
     if (numero.length !== 15 && numero.length !== 11) {
         exibirMensagemConsultaCNS("Informe um CNS com 15 dígitos ou um CPF com 11 dígitos.", "erro");
