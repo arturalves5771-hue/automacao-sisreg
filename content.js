@@ -8,6 +8,16 @@ PARTE 1: COMUNICAÇÃO COM NOSSA PÁGINA HTML
 window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
 
+    if (event.data.type === "CONSULTAR_DADOS_CNS") {
+        const numero = String(event.data.numero || "").replace(/\\D/g, "");
+        if (!numero) return;
+        chrome.runtime.sendMessage({
+            type: "CONSULTAR_DADOS_CNS",
+            numero: numero
+        });
+        return;
+    }
+
     if (event.data.type === "SISREG_LOGIN") {
         if (!event.data.username || !event.data.password) return;
         chrome.runtime.sendMessage({
@@ -50,6 +60,22 @@ PARTE 2: RECEBER RESPOSTA DO BACKGROUND
 =========================================================
 */
 chrome.runtime.onMessage.addListener(function (message) {
+    if (message.type === "DADOS_CNS_SUCESSO") {
+        window.postMessage({
+            type: "DADOS_CNS_SUCESSO",
+            jsonData: message.jsonData
+        }, "*");
+        return;
+    }
+
+    if (message.type === "CONSULTA_CNS_ERRO") {
+        window.postMessage({
+            type: "CONSULTA_CNS_ERRO",
+            mensagem: message.mensagem
+        }, "*");
+        return;
+    }
+
     if (message.type === "LOGIN_SISREG_SUCESSO") {
         window.postMessage({ type: "LOGIN_SISREG_SUCESSO" }, "*");
         return;
@@ -163,6 +189,133 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             const botaoEntrar = document.querySelector('[name="entrar"]');
             if (botaoEntrar) botaoEntrar.click();
         }, 500);
+    });
+
+
+    /*
+    -----------------------------------------------------
+    CONSULTA ISOLADA POR CNS / CPF
+    -----------------------------------------------------
+    */
+    function aguardarElementoCNS(seletor, tempoMaximo) {
+        return new Promise(function (resolve, reject) {
+            const inicio = Date.now();
+            const timer = setInterval(function () {
+                const elemento = document.querySelector(seletor);
+                if (elemento) {
+                    clearInterval(timer);
+                    resolve(elemento);
+                    return;
+                }
+                if (Date.now() - inicio >= tempoMaximo) {
+                    clearInterval(timer);
+                    reject(new Error("O campo de consulta CNS não apareceu no SISREG."));
+                }
+            }, 300);
+        });
+    }
+
+    function extrairDadosPaginaCNS() {
+        const campos = [];
+        document.querySelectorAll("input:not([type='password']):not([type='hidden']), select, textarea").forEach(function (campo) {
+            const rotulo = campo.labels && campo.labels.length
+                ? campo.labels[0].innerText.trim()
+                : (campo.name || campo.id || campo.getAttribute("aria-label") || "");
+            const valor = campo.tagName === "SELECT"
+                ? (campo.options[campo.selectedIndex] ? campo.options[campo.selectedIndex].text : "")
+                : campo.value;
+            if (rotulo || valor) campos.push({ campo: rotulo, valor: valor });
+        });
+
+        const tabelas = [];
+        document.querySelectorAll("table").forEach(function (tabela) {
+            const linhas = [];
+            tabela.querySelectorAll("tr").forEach(function (linha) {
+                const celulas = Array.from(linha.querySelectorAll("th, td"))
+                    .map(function (celula) { return celula.innerText.trim(); });
+                if (celulas.some(Boolean)) linhas.push(celulas);
+            });
+            if (linhas.length) tabelas.push(linhas);
+        });
+
+        return {
+            url: location.href,
+            titulo: document.title,
+            campos: campos,
+            tabelas: tabelas,
+            texto: document.body ? document.body.innerText.trim() : ""
+        };
+    }
+
+    async function executarConsultaCNS(numero) {
+        try {
+            let campo = document.querySelector('input[name="nu_cns"]');
+
+            /* Se ainda não estiver na tela de consulta, aciona a opção CNS do menu. */
+            if (!campo) {
+                const opcoes = Array.from(document.querySelectorAll("a, button, input[type='button'], input[type='submit']"));
+                const opcaoCNS = opcoes.find(function (elemento) {
+                    const texto = (elemento.innerText || elemento.value || elemento.getAttribute("title") || "").trim();
+                    const alvo = (elemento.getAttribute("href") || "") + " " + (elemento.getAttribute("onclick") || "");
+                    return /\\bCNS\\b/i.test(texto) || /cns/i.test(alvo);
+                });
+
+                if (!opcaoCNS) throw new Error("Não localizei a opção CNS no menu do SISREG.");
+                chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
+                opcaoCNS.click();
+                campo = await aguardarElementoCNS('input[name="nu_cns"]', 15000);
+            }
+
+            campo.focus();
+            campo.value = numero;
+            campo.dispatchEvent(new Event("input", { bubbles: true }));
+            campo.dispatchEvent(new Event("change", { bubbles: true }));
+
+            const formulario = campo.form;
+            if (!formulario) throw new Error("O campo nu_cns não está vinculado a um formulário.");
+
+            chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
+
+            const botaoEnviar = formulario.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
+            if (botaoEnviar) {
+                botaoEnviar.click();
+            } else if (formulario.requestSubmit) {
+                formulario.requestSubmit();
+            } else {
+                formulario.submit();
+            }
+
+            /* Em consultas sem recarregamento, captura o resultado neste mesmo documento. */
+            setTimeout(function () {
+                if (document.querySelector('input[name="nu_cns"]')) {
+                    const resultado = extrairDadosPaginaCNS();
+                    chrome.runtime.sendMessage({
+                        type: "DADOS_CNS_SUCESSO",
+                        jsonData: resultado
+                    });
+                }
+            }, 3500);
+
+        } catch (erro) {
+            chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_ERRO",
+                mensagem: erro.message || "Falha durante a consulta CNS."
+            });
+        }
+    }
+
+    chrome.runtime.onMessage.addListener(function (message) {
+        if (message.type === "EXECUTAR_CONSULTA_CNS") {
+            executarConsultaCNS(message.numero);
+            return;
+        }
+
+        if (message.type === "CAPTURAR_RESULTADO_CNS") {
+            chrome.runtime.sendMessage({
+                type: "DADOS_CNS_SUCESSO",
+                jsonData: extrairDadosPaginaCNS()
+            });
+        }
     });
 
     /*
