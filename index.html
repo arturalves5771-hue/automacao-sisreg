@@ -257,6 +257,51 @@
                 grid-template-columns: 1fr;
             }
         }
+    
+        :root{color-scheme:light;--brand-950:#102f2b;--brand-900:#16443c;--brand-800:#1d5a4e;--brand-100:#e7f2ee;--ink:#172b27;--muted:#687b76;--line:#dce7e2;--canvas:#f2f6f4;--success:#16834b;--shadow:0 14px 36px rgba(20,55,47,.08)}
+        body{min-height:100vh;font-family:Inter,"Segoe UI",Arial,sans-serif;background:var(--canvas);color:var(--ink);-webkit-font-smoothing:antialiased}
+        .container{width:min(1120px,calc(100% - 40px));margin:34px auto}
+        .card{overflow:hidden;background:#fff;border:1px solid rgba(220,231,226,.9);border-radius:22px;padding:0;box-shadow:var(--shadow)}
+        h1{margin:0;color:inherit;font-size:30px;letter-spacing:-.7px}
+        .login-area{max-width:460px;padding:34px 30px}
+        #cardLogin{padding:28px}#cardLogin h1{color:var(--brand-900);margin-bottom:8px}#cardLogin .subtitulo{margin-bottom:28px}
+        .status{padding:13px 16px;border:1px solid transparent;border-radius:12px;margin-bottom:24px;font-weight:650}
+        .status.conectado{background:#e9f7ef;color:#17683c;border-color:#ccebd8}
+        .status.erro{background:#fff0ef;color:#a12b26;border-color:#f4d2cf}
+        .app-header{background:linear-gradient(120deg,var(--brand-950),var(--brand-800));color:#fff;padding:28px 34px}
+        .app-header-inner{display:flex;align-items:center;justify-content:space-between;gap:22px}
+        .app-brand{min-width:0}.app-eyebrow{display:block;margin-bottom:9px;color:#b9d8cd;font-size:10px;font-weight:750;letter-spacing:1.35px}
+        .app-brand h1{color:#fff;font-size:clamp(25px,3vw,32px)}.app-brand p{margin:7px 0 0;color:#d3e5df;font-size:14px}
+        .status-header{display:inline-flex;align-items:center;gap:9px;flex:0 0 auto;margin:0;padding:10px 14px;border:1px solid rgba(255,255,255,.2)!important;border-radius:999px;background:rgba(255,255,255,.12)!important;color:#edfff5!important;font-size:13px;white-space:nowrap}
+        .status-dot{width:8px;height:8px;border-radius:50%;background:#69e39a;box-shadow:0 0 0 4px rgba(105,227,154,.14)}
+        .painel-conteudo{display:grid;gap:20px;padding:26px}
+        .exportacao{min-width:0;padding:24px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 3px 12px rgba(24,57,48,.035)}
+        .titulo-painel{display:flex;align-items:center;gap:10px;margin:0 0 20px;color:var(--brand-900);font-size:18px;font-weight:750;letter-spacing:-.25px}
+        label{display:block;margin-bottom:8px;color:#344a44;font-size:13px;font-weight:700}
+        input{width:100%;min-height:46px;padding:12px 14px;border:1px solid #cfdcd6;border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:14px;transition:border-color .18s,box-shadow .18s}
+        input::placeholder{color:#9aa9a3}input:focus{outline:none;border-color:#389477;box-shadow:0 0 0 4px rgba(56,148,119,.13)}
+        button{min-height:44px;border:1px solid transparent;border-radius:10px;padding:11px 17px;font:inherit;font-size:13px;font-weight:750;letter-spacing:.2px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s,opacity .15s}
+        button:hover:not(:disabled){transform:translateY(-1px)}button:active:not(:disabled){transform:translateY(0)}
+        button:focus-visible{outline:3px solid rgba(45,143,111,.35);outline-offset:3px}
+        .btn-login,.btn-exportar{background:var(--brand-800);color:#fff;box-shadow:0 4px 10px rgba(29,90,78,.12)}
+        .btn-login:hover:not(:disabled),.btn-exportar:hover:not(:disabled){background:var(--brand-950)}
+        .btn-login{width:100%}.btn-login:disabled,.btn-exportar:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+        .datas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.datas input{margin-bottom:18px}
+        .mensagem{margin-top:14px;padding:12px 14px;border:1px solid transparent;border-radius:10px;font-size:13px;line-height:1.5}
+        .mensagem.sucesso{display:block;background:#eaf7ef;color:#17683c;border-color:#d1ecda}.mensagem.erro{display:block;background:#fff0ef;color:#a12b26;border-color:#f4d2cf}
+        .oculto{display:none!important}
+        .consulta-cns input{margin-bottom:14px}.acoes-consulta-cns{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px}
+        .acoes-consulta-cns button{flex:1 1 190px;margin-top:0}
+        .btn-copiar-cns{background:#eaf3ef!important;color:var(--brand-900)!important;border-color:#cfe1d8!important;box-shadow:none!important}
+        .btn-copiar-cns:hover:not(:disabled){background:#dcece5!important}.btn-copiar-cns:disabled{opacity:.5;cursor:not-allowed}
+        .resumo-paciente-cns{margin-top:17px;padding:20px;border:1px solid #d5e6dc;border-left:4px solid var(--success);border-radius:13px;background:#f8fcf9}
+        .resumo-paciente-cns .linha-principal{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .resumo-paciente-cns .nome-paciente{color:#183a30;font-size:18px;font-weight:750;overflow-wrap:anywhere}
+        .resumo-paciente-cns .cartao-sus{color:#16834b;font-size:13px;font-weight:750;white-space:nowrap}
+        .resumo-paciente-cns .nome-mae{display:block;margin-top:8px;color:#71817b;font-size:13px}
+        .resultado-cns{margin-top:16px;padding:16px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--line);border-radius:10px;background:#f7faf8;color:#344a44;font:13px/1.5 Consolas,"Courier New",monospace}
+        @media(max-width:700px){.container{width:min(calc(100% - 24px),600px);margin:12px auto}.card{border-radius:16px}.app-header{padding:23px 20px}.app-header-inner{align-items:flex-start;flex-direction:column;gap:16px}.status-header{align-self:flex-start}.painel-conteudo{padding:15px;gap:14px}.exportacao{padding:18px;border-radius:14px}.datas{grid-template-columns:1fr;gap:0}.acoes-consulta-cns{flex-direction:column}.acoes-consulta-cns button{width:100%;flex-basis:auto}#cardLogin{padding:12px}.login-area{padding:24px 12px}}
+
     </style>
 </head>
 
@@ -291,11 +336,40 @@
 
     <!-- PAINEL -->
     <div class="card painel" id="painel">
-        <h1>Automação SISREG</h1>
-        <div class="subtitulo">Painel de automação</div>
+        <header class="app-header">
+            <div class="app-header-inner">
+                <div class="app-brand">
+                    <span class="app-eyebrow">COMPLEXO PEDIÁTRICO ARLINDA MARQUES</span>
+                    <h1>Automação SISREG</h1>
+                    <p>Painel de consultas e exportação de agendas</p>
+                </div>
+                <div class="status conectado status-header" id="statusPainel">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    SISREG conectado
+                </div>
+            </div>
+        </header>
+        <main class="painel-conteudo">
 
-        <div class="status conectado" id="statusPainel">
-            🟢 SISREG conectado
+        <!-- CONSULTA POR CNS / CPF (MÓDULO ADICIONAL) -->
+        <div class="exportacao consulta-cns" id="secaoConsultaCNS" style="margin-top: 18px;">
+            <div class="titulo-painel">🔎 Consulta por CNS / CPF</div>
+            <label for="numeroConsultaCNS">Cartão Nacional de Saúde (CNS) ou CPF</label>
+            <input type="text" id="numeroConsultaCNS" inputmode="numeric" autocomplete="off"
+                maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
+            <div class="acoes-consulta-cns">
+                <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
+                <button class="btn-exportar btn-copiar-cns" id="btnCopiarDadosCNS" type="button" disabled>📋 COPIAR INFORMAÇÕES</button>
+            </div>
+            <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
+            <div id="resumoPacienteCNS" class="resumo-paciente-cns oculto" aria-live="polite">
+                <div class="linha-principal">
+                    <span id="nomePacienteCNS" class="nome-paciente"></span>
+                    <span id="cartaoSUSCNS" class="cartao-sus"></span>
+                </div>
+                <span id="nomeMaeCNS" class="nome-mae"></span>
+            </div>
+            <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
         </div>
 
         <!-- PASTA DE DESTINO -->
@@ -312,6 +386,8 @@
                 ⚠️ Nenhuma pasta configurada.
             </div>
         </div>
+
+        
 
         <!-- EXPORTAÇÃO -->
         <div class="exportacao">
@@ -338,26 +414,8 @@
             <div class="mensagem" id="mensagem"></div>
         </div>
 
-        <!-- CONSULTA POR CNS / CPF (MÓDULO ADICIONAL) -->
-        <div class="exportacao consulta-cns" id="secaoConsultaCNS" style="margin-top: 18px;">
-            <div class="titulo-painel">🔎 Consulta por CNS / CPF</div>
-            <label for="numeroConsultaCNS">Cartão Nacional de Saúde (CNS) ou CPF</label>
-            <input type="text" id="numeroConsultaCNS" inputmode="numeric" autocomplete="off"
-                maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
-            <div class="acoes-consulta-cns">
-                <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
-                <button class="btn-exportar btn-copiar-cns" id="btnCopiarDadosCNS" type="button" disabled>📋 COPIAR INFORMAÇÕES</button>
-            </div>
-            <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
-            <div id="resumoPacienteCNS" class="resumo-paciente-cns oculto" aria-live="polite">
-                <div class="linha-principal">
-                    <span id="nomePacienteCNS" class="nome-paciente"></span>
-                    <span id="cartaoSUSCNS" class="cartao-sus"></span>
-                </div>
-                <span id="nomeMaeCNS" class="nome-mae"></span>
-            </div>
-            <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
-        </div>
+        
+        </main>
     </div>
 
 </div>
