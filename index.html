@@ -183,6 +183,61 @@
             cursor: not-allowed;
         }
 
+        .acoes-consulta-cns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: stretch;
+        }
+
+        .acoes-consulta-cns button {
+            flex: 1 1 180px;
+            margin-top: 0;
+        }
+
+        .btn-copiar-cns:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            background: #6b7280;
+        }
+
+        .resumo-paciente-cns {
+            margin-top: 18px;
+            padding: 18px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #ffffff;
+        }
+
+        .resumo-paciente-cns .linha-principal {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .resumo-paciente-cns .nome-paciente {
+            color: #111827;
+            font-size: 18px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .resumo-paciente-cns .cartao-sus {
+            color: #15803d;
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .resumo-paciente-cns .nome-mae {
+            display: block;
+            margin-top: 7px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
         .resultado-cns {
             margin-top: 16px;
             padding: 16px;
@@ -289,10 +344,19 @@
             <label for="numeroConsultaCNS">Cartão Nacional de Saúde (CNS) ou CPF</label>
             <input type="text" id="numeroConsultaCNS" inputmode="numeric" autocomplete="off"
                 maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
-            <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
+            <div class="acoes-consulta-cns">
+                <button class="btn-exportar" id="btnConsultarCNS" type="button">CONSULTAR DADOS</button>
+                <button class="btn-exportar btn-copiar-cns" id="btnCopiarDadosCNS" type="button" disabled>📋 COPIAR INFORMAÇÕES</button>
+            </div>
             <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
+            <div id="resumoPacienteCNS" class="resumo-paciente-cns oculto" aria-live="polite">
+                <div class="linha-principal">
+                    <span id="nomePacienteCNS" class="nome-paciente"></span>
+                    <span id="cartaoSUSCNS" class="cartao-sus"></span>
+                </div>
+                <span id="nomeMaeCNS" class="nome-mae"></span>
+            </div>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
-            <button class="btn-exportar oculto" id="btnCopiarDadosCNS" type="button" style="margin-top: 12px;">📋 COPIAR INFORMAÇÕES</button>
         </div>
     </div>
 
@@ -322,6 +386,10 @@ const numeroConsultaCNS = document.getElementById("numeroConsultaCNS");
 const btnConsultarCNS = document.getElementById("btnConsultarCNS");
 const mensagemConsultaCNS = document.getElementById("mensagemConsultaCNS");
 const resultadoConsultaCNS = document.getElementById("resultadoConsultaCNS");
+const resumoPacienteCNS = document.getElementById("resumoPacienteCNS");
+const nomePacienteCNS = document.getElementById("nomePacienteCNS");
+const cartaoSUSCNS = document.getElementById("cartaoSUSCNS");
+const nomeMaeCNS = document.getElementById("nomeMaeCNS");
 const btnCopiarDadosCNS = document.getElementById("btnCopiarDadosCNS");
 
 let pastaSISREG = null;
@@ -758,6 +826,59 @@ btnCopiarDadosCNS.addEventListener("click", async function () {
     }
 });
 
+function normalizarRotuloCNS(valor) {
+    return String(valor || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toUpperCase().trim();
+}
+
+function localizarValorCNS(dados, padroes) {
+    const procurarEmCelulas = function (linhas) {
+        for (const linha of (linhas || [])) {
+            for (let i = 0; i < linha.length; i++) {
+                const rotulo = normalizarRotuloCNS(linha[i]);
+                if (padroes.some(function (padrao) { return padrao.test(rotulo); })) {
+                    const valor = linha.slice(i + 1).find(function (item) { return String(item || "").trim(); });
+                    if (valor) return String(valor).trim();
+                }
+            }
+        }
+        return "";
+    };
+
+    for (const tabela of (dados.tabelas || [])) {
+        const valor = procurarEmCelulas(tabela);
+        if (valor) return valor;
+    }
+
+    for (const campo of (dados.campos || [])) {
+        const rotulo = normalizarRotuloCNS(campo.campo);
+        if (padroes.some(function (padrao) { return padrao.test(rotulo); }) && String(campo.valor || "").trim()) {
+            return String(campo.valor).trim();
+        }
+    }
+
+    const linhasTexto = String(dados.texto || "").split(/\\r?\\n/).map(function (linha) { return linha.trim(); }).filter(Boolean);
+    for (let i = 0; i < linhasTexto.length; i++) {
+        const rotulo = normalizarRotuloCNS(linhasTexto[i]);
+        if (padroes.some(function (padrao) { return padrao.test(rotulo); })) {
+            const mesmaLinha = linhasTexto[i].split(/[:：]/).slice(1).join(":").trim();
+            if (mesmaLinha) return mesmaLinha;
+            if (linhasTexto[i + 1]) return linhasTexto[i + 1].trim();
+        }
+    }
+    return "";
+}
+
+function exibirResumoPacienteCNS(dados) {
+    const nome = localizarValorCNS(dados, [/^NOME(?: DO PACIENTE| DO USUARIO)?$/]);
+    const cartao = localizarValorCNS(dados, [/^CNS$/, /CARTAO NACIONAL DE SAUDE/, /^NUMERO DO CARTAO SUS$/]);
+    const mae = localizarValorCNS(dados, [/^NOME DA MAE$/, /^MAE$/]);
+
+    nomePacienteCNS.textContent = nome || "Nome não identificado";
+    cartaoSUSCNS.textContent = cartao ? "🟢 CNS: " + cartao : "🟢 Consulta realizada";
+    nomeMaeCNS.textContent = mae ? "Mãe: " + mae : "";
+    resumoPacienteCNS.classList.remove("oculto");
+}
+
 btnConsultarCNS.addEventListener("click", function () {
     const numero = numeroConsultaCNS.value.replace(/\D/g, "");
 
@@ -773,7 +894,8 @@ btnConsultarCNS.addEventListener("click", function () {
 
     resultadoConsultaCNS.textContent = "";
     resultadoConsultaCNS.classList.add("oculto");
-    btnCopiarDadosCNS.classList.add("oculto");
+    resumoPacienteCNS.classList.add("oculto");
+    btnCopiarDadosCNS.disabled = true;
     btnConsultarCNS.disabled = true;
     btnConsultarCNS.textContent = "CONSULTANDO...";
     exibirMensagemConsultaCNS("⏳ Abrindo o SISREG e realizando a consulta. Aguarde...", "sucesso");
@@ -795,8 +917,8 @@ window.addEventListener("message", function (event) {
 
         const dados = event.data.jsonData;
         resultadoConsultaCNS.textContent = JSON.stringify(dados, null, 2);
-        resultadoConsultaCNS.classList.remove("oculto");
-        btnCopiarDadosCNS.classList.remove("oculto");
+        exibirResumoPacienteCNS(dados);
+        btnCopiarDadosCNS.disabled = false;
         return;
     }
 
