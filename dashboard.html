@@ -554,6 +554,22 @@ button:disabled{
 
     </style>
 <style>
+/* Informações do paciente + tabela CONSULTAS */
+.titulo-info-paciente{margin:0 0 14px;color:var(--brand-900);font-size:11px;font-weight:800;letter-spacing:1.15px}
+.painel-consultas-cns{margin-top:20px;padding-top:18px;border-top:1px solid #e1ebe5}
+.cabecalho-consultas-cns{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+.titulo-consultas-cns{margin:0;color:var(--brand-900);font-size:16px;font-weight:800;letter-spacing:.45px}
+.contador-consultas-cns{padding:5px 9px;border:1px solid #d7e8de;border-radius:999px;background:#edf7f1;color:#17683c;font-size:11px;font-weight:750;white-space:nowrap}
+.tabela-consultas-wrapper{width:100%;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#fff}
+.tabela-consultas-cns{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0;font-size:12px;text-align:left}
+.tabela-consultas-cns th{position:sticky;top:0;padding:12px 11px;background:#edf5f0;color:#36584b;font-size:10px;font-weight:800;letter-spacing:.45px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid #dce9e1}
+.tabela-consultas-cns td{padding:12px 11px;color:#344a44;vertical-align:top;border-bottom:1px solid #edf1ee;line-height:1.45}
+.tabela-consultas-cns tbody tr:last-child td{border-bottom:0}
+.tabela-consultas-cns tbody tr:hover{background:#f7fbf8}
+.tabela-consultas-cns .col-id{font-weight:800;color:var(--brand-900);white-space:nowrap}
+.tabela-consultas-cns .col-situacao{font-weight:750;white-space:nowrap}
+.estado-vazio-consultas{padding:22px!important;color:#7b8b84!important;text-align:center!important;font-size:12px}
+@media(max-width:700px){.painel-consultas-cns{margin-top:17px;padding-top:15px}.tabela-consultas-cns{min-width:1050px}.cabecalho-consultas-cns{align-items:flex-start}}
 /* Enquadramento exclusivo da dashboard */
 body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidden;align-items:initial}
 .container{width:min(1120px,calc(100% - 40px));margin:30px auto}
@@ -596,11 +612,30 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
             </div>
             <div class="mensagem" id="mensagemConsultaCNS" role="status" aria-live="polite"></div>
             <div id="resumoPacienteCNS" class="resumo-paciente-cns oculto" aria-live="polite">
+                <h3 class="titulo-info-paciente">INFORMAÇÕES DO PACIENTE</h3>
                 <div class="linha-principal">
                     <span id="nomePacienteCNS" class="nome-paciente"></span>
                     <span id="cartaoSUSCNS" class="cartao-sus"></span>
                 </div>
                 <span id="nomeMaeCNS" class="nome-mae"></span>
+                <section class="painel-consultas-cns" aria-labelledby="tituloConsultasCNS">
+                    <div class="cabecalho-consultas-cns">
+                        <h3 class="titulo-consultas-cns" id="tituloConsultasCNS">CONSULTAS</h3>
+                        <span id="contadorConsultasCNS" class="contador-consultas-cns">0 registros</span>
+                    </div>
+                    <div class="tabela-consultas-wrapper">
+                        <table class="tabela-consultas-cns">
+                            <thead><tr>
+                                <th>ID</th><th>CNS</th><th>Data de nascimento</th><th>Data solicitação</th>
+                                <th>Município</th><th>Idade</th><th>Procedimento</th><th>CID / Descrição</th>
+                                <th>Solicitante</th><th>Executante</th><th>Data agendamento</th><th>Situação</th>
+                            </tr></thead>
+                            <tbody id="corpoTabelaConsultasCNS">
+                                <tr><td colspan="12" class="estado-vazio-consultas">Aguardando dados do SISREG III...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
             </div>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
         </section>
@@ -668,6 +703,8 @@ const nomePacienteCNS=document.getElementById("nomePacienteCNS");
 const cartaoSUSCNS=document.getElementById("cartaoSUSCNS");
 const nomeMaeCNS=document.getElementById("nomeMaeCNS");
 const btnCopiarDadosCNS=document.getElementById("btnCopiarDadosCNS");
+const corpoTabelaConsultasCNS=document.getElementById("corpoTabelaConsultasCNS");
+const contadorConsultasCNS=document.getElementById("contadorConsultasCNS");
 let pastaSISREG=null;
 const DB_NOME="AutomacaoSISREG",DB_VERSAO=1,DB_STORE="configuracoes",DB_CHAVE_PASTA="pastaSISREG";
 document.addEventListener("DOMContentLoaded",async function(){carregarDatasPadrao();await inicializarPastaSISREG();});
@@ -1125,6 +1162,42 @@ function exibirResumoPacienteCNS(dados) {
     cartaoSUSCNS.textContent = cartao ? "🟢 CNS: " + cartao : "🟢 Consulta realizada";
     nomeMaeCNS.textContent = mae ? "Mãe: " + mae : "";
     resumoPacienteCNS.classList.remove("oculto");
+    renderizarConsultasCNS(Array.isArray(dados.consultas) ? dados.consultas : []);
+}
+
+function renderizarConsultasCNS(consultas) {
+    const lista = Array.isArray(consultas) ? consultas : [];
+    corpoTabelaConsultasCNS.replaceChildren();
+    contadorConsultasCNS.textContent = lista.length + (lista.length === 1 ? " registro" : " registros");
+
+    if (!lista.length) {
+        const linha = document.createElement("tr");
+        const celula = document.createElement("td");
+        celula.colSpan = 12;
+        celula.className = "estado-vazio-consultas";
+        celula.textContent = "Nenhuma consulta encontrada para este CNS.";
+        linha.appendChild(celula);
+        corpoTabelaConsultasCNS.appendChild(linha);
+        return;
+    }
+
+    lista.forEach(function (consulta) {
+        const linha = document.createElement("tr");
+        const valores = [
+            consulta.id, consulta.cns, consulta.dataNascimento, consulta.dataSolicitacao,
+            consulta.municipio, consulta.idade, consulta.procedimento,
+            [consulta.cid, consulta.cidDescricao].filter(Boolean).join(" — "),
+            consulta.solicitante, consulta.executante, consulta.dataAgendamento, consulta.situacao
+        ];
+        valores.forEach(function (valor, indice) {
+            const celula = document.createElement("td");
+            celula.textContent = valor == null || valor === "" ? "—" : String(valor);
+            if (indice === 0) celula.className = "col-id";
+            if (indice === 11) celula.className = "col-situacao";
+            linha.appendChild(celula);
+        });
+        corpoTabelaConsultasCNS.appendChild(linha);
+    });
 }
 
 btnConsultarCNS.addEventListener("click", function () {
@@ -1143,6 +1216,7 @@ btnConsultarCNS.addEventListener("click", function () {
     resultadoConsultaCNS.textContent = "";
     resultadoConsultaCNS.classList.add("oculto");
     resumoPacienteCNS.classList.add("oculto");
+    renderizarConsultasCNS([]);
     btnCopiarDadosCNS.disabled = true;
     btnConsultarCNS.disabled = true;
     btnConsultarCNS.textContent = "CONSULTANDO...";
@@ -1163,7 +1237,8 @@ window.addEventListener("message", function (event) {
         btnConsultarCNS.textContent = "CONSULTAR DADOS";
         exibirMensagemConsultaCNS("✅ Consulta concluída. Confira os dados abaixo.", "sucesso");
 
-        const dados = event.data.jsonData;
+        const dados = event.data.jsonData || {};
+        dados.consultas = Array.isArray(event.data.consultas) ? event.data.consultas : [];
         resultadoConsultaCNS.textContent = JSON.stringify(dados, null, 2);
         exibirResumoPacienteCNS(dados);
         btnCopiarDadosCNS.disabled = false;
