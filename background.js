@@ -33,6 +33,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             consultaCNSAguardandoResultado: false,
             consultaCNSResultado: null,
             consultaCNSNumeroEncontrado: null,
+            consultaCNSConsultas: [],
             consultaEtapa: "cadweb",
             abaNossaPagina: abaNossaPagina
         });
@@ -142,7 +143,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
             "consultaCNSAguardandoResultado", "consultaCNSResultado",
-            "consultaCNSNumeroEncontrado", "consultaEtapa"
+            "consultaCNSNumeroEncontrado", "consultaCNSConsultas", "consultaEtapa"
         ]);
                 setTimeout(async () => { try { await chrome.tabs.remove(tabId); } catch (e) {} }, 500);
                 return;
@@ -313,16 +314,24 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         return;
     }
 
+    if (message.type === "CONSULTA_CNS_CONSULTAS_CAPTURADAS") {
+        await chrome.storage.session.set({
+            consultaCNSConsultas: Array.isArray(message.consultas) ? message.consultas : []
+        });
+        return;
+    }
+
     if (message.type === "CONSULTA_CNS_PREENCHIMENTO_CONCLUIDO") {
         const dados = await chrome.storage.session.get([
-            "abaNossaPagina", "abaSISREG", "consultaCNSResultado"
+            "abaNossaPagina", "abaSISREG", "consultaCNSResultado", "consultaCNSConsultas"
         ]);
 
         if (dados.abaNossaPagina) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
                     type: "DADOS_CNS_SUCESSO",
-                    jsonData: dados.consultaCNSResultado
+                    jsonData: dados.consultaCNSResultado,
+                    consultas: dados.consultaCNSConsultas || []
                 });
             } catch (e) {}
         }
@@ -331,7 +340,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
             "consultaCNSAguardandoResultado", "consultaCNSResultado",
-            "consultaCNSNumeroEncontrado", "consultaEtapa"
+            "consultaCNSNumeroEncontrado", "consultaCNSConsultas", "consultaEtapa"
         ]);
 
         if (dados.abaSISREG) {
