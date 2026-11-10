@@ -852,9 +852,10 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             // SOLICITAÇÕES. Nesse caso, reutiliza diretamente o campo cns_paciente
             // e NÃO reabre a pesquisa inicial nem navega pelo menu novamente.
             const campoSolicitacoesAtual = percorrerDocumentos(function (doc) {
-                let url = "";
-                try { url = doc.location.href; } catch (erro) {}
-                if (!/gerenciador_solicitacao/i.test(url)) return null;
+                // A tela principal do SISREG pode estar em /cgi-bin/index,
+                // enquanto o conteúdo de Solicitações é carregado em frames.
+                // O campo cns_paciente é o identificador confiável da tela;
+                // não exigir gerenciador_solicitacao na URL do frame.
                 const campo = doc.querySelector('input[name="cns_paciente"]');
                 return campo && campo.getClientRects().length ? campo : null;
             });
