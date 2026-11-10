@@ -1,3 +1,36 @@
+async function tratarSessaoExpiradaSISREG(tabId, mensagem) {
+    if (!tabId || tabId < 0) return;
+    const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
+    if ((dados.abaSISREG && dados.abaSISREG !== tabId) || dados.sessaoExpiradaNotificada) return;
+
+    await chrome.storage.session.set({ sessaoExpiradaNotificada: true, operacaoAtual: null });
+    await chrome.storage.session.remove([
+        "loginSISREG", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada",
+        "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado",
+        "consultaCNSConsultas", "consultaEtapa", "exportacaoCSV", "exportacaoIniciada"
+    ]);
+
+    if (dados.abaNossaPagina) {
+        try {
+            await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                type: "SISREG_SESSAO_EXPIRADA",
+                mensagem: mensagem || "O SISREG encerrou sua sessão porque houve um novo acesso em outra estação. Entre novamente."
+            });
+        } catch (erro) {
+            console.warn("Não foi possível avisar a tela da Automação SISREG:", erro);
+        }
+    }
+}
+
+chrome.webRequest.onCompleted.addListener(function (details) {
+    if ([401, 403, 419, 440].includes(details.statusCode)) {
+        tratarSessaoExpiradaSISREG(
+            details.tabId,
+            "O SISREG recusou uma requisição (HTTP " + details.statusCode + "). Sua sessão pode ter sido encerrada. Entre novamente."
+        );
+    }
+}, { urls: ["https://sisregiii.saude.gov.br/*"] });
+
 console.log("BACKGROUND SISREG INICIADO");
 
 let abaNossaPagina = null;
@@ -115,27 +148,10 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     =================================================
     */
     if (message.type === "SISREG_SESSAO_EXPIRADA") {
-        const tabId = sender.tab?.id;
-        const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
-        if (!tabId || (dados.abaSISREG && dados.abaSISREG !== tabId) || dados.sessaoExpiradaNotificada) return;
-
-        await chrome.storage.session.set({ sessaoExpiradaNotificada: true, operacaoAtual: null });
-        await chrome.storage.session.remove([
-            "loginSISREG", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada",
-            "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado",
-            "consultaCNSConsultas", "consultaEtapa", "exportacaoCSV", "exportacaoIniciada"
-        ]);
-
-        if (dados.abaNossaPagina) {
-            try {
-                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
-                    type: "SISREG_SESSAO_EXPIRADA",
-                    mensagem: message.mensagem || "O SISREG encerrou sua sessão porque houve um novo acesso em outra estação. Entre novamente."
-                });
-            } catch (erro) {
-                console.warn("Não foi possível avisar a tela da Automação SISREG:", erro);
-            }
-        }
+        await tratarSessaoExpiradaSISREG(
+            sender.tab?.id,
+            message.mensagem || "O SISREG encerrou sua sessão. Entre novamente."
+        );
         return;
     }
 
