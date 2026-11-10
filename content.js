@@ -932,8 +932,10 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"O clique foi executado, mas a ficha detalhada não apareceu em até 18 segundos."});
             return;
         }
-        const copiaFicha = tabelaFicha.cloneNode(true);
-        const originais = [tabelaFicha, ...Array.from(tabelaFicha.querySelectorAll("*"))];
+        // Captura a ficha inteira, incluindo o título/rodapé da área original.
+        const fichaOriginal = tabelaFicha.closest("#fichaAmbulatorial") || tabelaFicha;
+        const copiaFicha = fichaOriginal.cloneNode(true);
+        const originais = [fichaOriginal, ...Array.from(fichaOriginal.querySelectorAll("*"))];
         const copias = [copiaFicha, ...Array.from(copiaFicha.querySelectorAll("*"))];
         originais.forEach(function (original, indice) {
             const copia = copias[indice];
