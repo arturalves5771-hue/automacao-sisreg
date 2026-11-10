@@ -171,7 +171,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         OPERAÇÃO: CONSULTA CNS / CPF
         ---------------------------------------------
         */
-        if (dados.operacaoAtual === "consultar_cns" && dados.consultaEtapa !== "solicitacoes") {
+        if (dados.operacaoAtual === "consultar_cns" && dados.consultaEtapa === "cadweb") {
             if (message.telaLogin === true) {
                 if (dados.abaNossaPagina) {
                     try {
@@ -444,10 +444,15 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             } catch (e) {}
         }
 
-        await chrome.storage.session.set({ operacaoAtual: null });
+        // Mantém a etapa como "solicitacoes" enquanto a aba SISREG estiver aberta.
+        // Assim, abrir outra ficha nunca será confundido com uma nova consulta CADWEB (nu_cns).
+        await chrome.storage.session.set({
+            operacaoAtual: null,
+            consultaEtapa: "solicitacoes"
+        });
         await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
-            "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
+            "consultaCNSAguardandoResultado", "consultaCNSConsultas"
         ]);
 
         // A aba do SISREG permanece aberta em segundo plano para abrir as fichas selecionadas.
@@ -455,7 +460,22 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     }
 
     if (message.type === "DADOS_CNS_SUCESSO" || message.type === "CONSULTA_CNS_ERRO") {
-        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
+        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG", "consultaEtapa"]);
+
+        // Um erro da rotina CADWEB não pode encerrar a aba SISREG depois que a consulta
+        // inicial já terminou e a aplicação está trabalhando na tabela de Solicitações.
+        if (message.type === "CONSULTA_CNS_ERRO" && dados.consultaEtapa === "solicitacoes") {
+            if (dados.abaNossaPagina) {
+                try {
+                    await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                        type: "DADOS_CNS_FICHA_ERRO",
+                        mensagem: message.mensagem || "Não foi possível concluir esta ação na tela de Solicitações."
+                    });
+                } catch (e) {}
+            }
+            return;
+        }
+
         if (dados.abaNossaPagina) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -611,7 +631,7 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
             } catch (e) {
                 console.error("Não foi possível retomar o preenchimento do CNS em Solicitações:", e);
             }
-        } else {
+        } else if (dados.consultaEtapa === "cadweb") {
             await chrome.storage.session.set({ consultaCNSIniciada: true });
             try {
                 await chrome.tabs.sendMessage(tabId, {
