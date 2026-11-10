@@ -60,6 +60,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             loginSISREG: { username: message.username, password: message.password },
             operacaoAtual: "login",
             tentativaEnviada: false,
+            sessaoExpiradaNotificada: false,
             abaNossaPagina: abaNossaPagina
         });
 
@@ -113,6 +114,31 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     ACOMPANHAMENTO DO ESTADO DO SISREG
     =================================================
     */
+    if (message.type === "SISREG_SESSAO_EXPIRADA") {
+        const tabId = sender.tab?.id;
+        const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
+        if (!tabId || (dados.abaSISREG && dados.abaSISREG !== tabId) || dados.sessaoExpiradaNotificada) return;
+
+        await chrome.storage.session.set({ sessaoExpiradaNotificada: true, operacaoAtual: null });
+        await chrome.storage.session.remove([
+            "loginSISREG", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada",
+            "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado",
+            "consultaCNSConsultas", "consultaEtapa", "exportacaoCSV", "exportacaoIniciada"
+        ]);
+
+        if (dados.abaNossaPagina) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: "SISREG_SESSAO_EXPIRADA",
+                    mensagem: message.mensagem || "O SISREG encerrou sua sessão porque houve um novo acesso em outra estação. Entre novamente."
+                });
+            } catch (erro) {
+                console.warn("Não foi possível avisar a tela da Automação SISREG:", erro);
+            }
+        }
+        return;
+    }
+
     if (message.type === "SISREG_ESTADO") {
         const tabId = sender.tab?.id;
         if (!tabId) return;
