@@ -651,15 +651,11 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
                 console.error("Não foi possível retomar o preenchimento do CNS em Solicitações:", e);
             }
         } else if (dados.consultaEtapa === "cadweb") {
-            await chrome.storage.session.set({ consultaCNSIniciada: true });
-            try {
-                await chrome.tabs.sendMessage(tabId, {
-                    type: "EXECUTAR_CONSULTA_CNS",
-                    numero: dados.consultaCNS?.numero
-                });
-            } catch (e) {
-                console.error("Não foi possível retomar a consulta inicial do CNS:", e);
-            }
+            // A navegação para CONSULTA AMB > CNS foi iniciada pelo próprio
+            // content.js, que continua aguardando o campo nu_cns e fará a pesquisa.
+            // Não reenviar EXECUTAR_CONSULTA_CNS aqui: isso pode iniciar uma segunda
+            // execução quando o SISREG já estiver exibindo o resultado do paciente.
+            console.log("Navegação inicial do CADWEB concluída; mantendo a execução atual da consulta.");
         }
         return;
     }
