@@ -1,3 +1,16 @@
+async function localizarFrameSolicitacoes(tabId) {
+    try {
+        const frames = await chrome.webNavigation.getAllFrames({ tabId: tabId });
+        const frame = (frames || []).find(function (item) {
+            return String(item.url || "").includes("/cgi-bin/gerenciador_solicitacao");
+        });
+        return frame ? frame.frameId : null;
+    } catch (erro) {
+        console.error("Não foi possível identificar o frame de Solicitações:", erro);
+        return null;
+    }
+}
+
 async function tratarSessaoExpiradaSISREG(tabId, mensagem) {
     if (!tabId || tabId < 0) return;
     const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
@@ -390,10 +403,12 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             consultaCNSAguardandoResultado: false
         });
         try {
+            const frameId = await localizarFrameSolicitacoes(dados.abaSISREG);
+            if (frameId === null) throw new Error("Frame da tela de Solicitações não encontrado.");
             await chrome.tabs.sendMessage(dados.abaSISREG, {
                 type: "PREENCHER_CNS_SOLICITACOES",
                 cns: dados.cnsSolicitacoesAtual
-            }, { frameId: 1 });
+            }, { frameId: frameId });
         } catch (erro) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -623,10 +638,12 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
 
         if (dados.consultaEtapa === "solicitacoes") {
             try {
+                const frameId = await localizarFrameSolicitacoes(tabId);
+                if (frameId === null) throw new Error("Frame da tela de Solicitações não encontrado após a navegação.");
                 await chrome.tabs.sendMessage(tabId, {
                     type: "PREENCHER_CNS_SOLICITACOES",
                     cns: dados.consultaCNSNumeroEncontrado
-                }, { frameId: 1 });
+                }, { frameId: frameId });
             } catch (e) {
                 console.error("Não foi possível retomar o preenchimento do CNS em Solicitações:", e);
             }
