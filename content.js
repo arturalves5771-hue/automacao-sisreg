@@ -848,9 +848,25 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 jsonData: dadosResultado || {}
             });
 
+            // Ao voltar de uma ficha, o SISREG normalmente já está na tela
+            // SOLICITAÇÕES. Nesse caso, reutiliza diretamente o campo cns_paciente
+            // e NÃO reabre a pesquisa inicial nem navega pelo menu novamente.
+            const campoSolicitacoesAtual = percorrerDocumentos(function (doc) {
+                let url = "";
+                try { url = doc.location.href; } catch (erro) {}
+                if (!/gerenciador_solicitacao/i.test(url)) return null;
+                const campo = doc.querySelector('input[name="cns_paciente"]');
+                return campo && campo.getClientRects().length ? campo : null;
+            });
+
+            if (campoSolicitacoesAtual) {
+                await concluirPreenchimentoSolicitacoes(numeroCNS);
+                return;
+            }
+
             const menuConsultaAmb = localizarMenuConsultaAmb();
             if (!menuConsultaAmb) {
-                throw new Error("Não localizei o menu CONSULTA AMB no SISREG.");
+                throw new Error("Não localizei o menu CONSULTA AMB no SISREG e a tela SOLICITAÇÕES não está aberta.");
             }
 
             const itemMenu = abrirMenuConsultaAmb(menuConsultaAmb);
