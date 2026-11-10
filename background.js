@@ -142,8 +142,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 await chrome.storage.session.set({ operacaoAtual: null });
                 await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
-            "consultaCNSAguardandoResultado", "consultaCNSResultado",
-            "consultaCNSNumeroEncontrado", "consultaCNSConsultas", "consultaEtapa"
+            "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
         ]);
                 setTimeout(async () => { try { await chrome.tabs.remove(tabId); } catch (e) {} }, 500);
                 return;
@@ -295,6 +294,8 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         await chrome.storage.session.set({
             consultaCNSResultado: message.jsonData,
             consultaCNSNumeroEncontrado: message.cns,
+            cnsSolicitacoesAtual: message.cns,
+            dadosPacienteCNSAtual: message.jsonData,
             consultaEtapa: "solicitacoes",
             consultaCNSAguardandoResultado: false
         });
@@ -318,6 +319,45 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         await chrome.storage.session.set({
             consultaCNSConsultas: Array.isArray(message.consultas) ? message.consultas : []
         });
+        return;
+    }
+
+    if (message.type === "RETORNAR_SOLICITACOES_CNS") {
+        const dados = await chrome.storage.session.get([
+            "abaSISREG", "abaNossaPagina", "cnsSolicitacoesAtual", "dadosPacienteCNSAtual"
+        ]);
+        if (!dados.abaSISREG || !dados.cnsSolicitacoesAtual) {
+            if (dados.abaNossaPagina) {
+                try {
+                    await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                        type: "DADOS_CNS_FICHA_ERRO",
+                        mensagem: "Não consegui recuperar o CNS desta consulta. Faça uma nova pesquisa."
+                    });
+                } catch (erro) {}
+            }
+            return;
+        }
+        await chrome.storage.session.set({
+            operacaoAtual: "consultar_cns",
+            consultaEtapa: "solicitacoes",
+            consultaCNSNumeroEncontrado: dados.cnsSolicitacoesAtual,
+            consultaCNSAguardandoNavegacao: false,
+            consultaCNSAguardandoResultado: false
+        });
+        try {
+            await chrome.tabs.sendMessage(dados.abaSISREG, {
+                type: "RETORNAR_SOLICITACOES_CNS",
+                cns: dados.cnsSolicitacoesAtual,
+                jsonData: dados.dadosPacienteCNSAtual || {}
+            });
+        } catch (erro) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                    type: "DADOS_CNS_FICHA_ERRO",
+                    mensagem: "A sessão do SISREG não respondeu. Faça uma nova consulta por CNS/CPF."
+                });
+            } catch (falha) {}
+        }
         return;
     }
 
