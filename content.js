@@ -495,54 +495,51 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
     function localizarMenuConsultaAmb() {
         return percorrerDocumentos(function (doc) {
-            const elementos = Array.from(doc.querySelectorAll(
-                "a, button, [onclick], [role='menuitem'], li, span"
-            ));
-
-            const encontrados = elementos.filter(function (elemento) {
-                const texto = normalizarTextoMenu(
-                    (elemento.innerText || elemento.textContent || "") + " " +
-                    (elemento.getAttribute("title") || "")
-                );
-                return texto === "CONSULTA AMB";
-            });
-
-            encontrados.sort(function (a, b) {
-                return (a.innerText || a.textContent || "").trim().length -
-                    (b.innerText || b.textContent || "").trim().length;
-            });
-
-            return encontrados[0] || null;
+            // No HTML real do SISREG, o pai é um link .sf-with-ul.
+            // O texto também contém o indicador » dentro de um span.
+            const links = Array.from(doc.querySelectorAll("a.sf-with-ul"));
+            return links.find(function (link) {
+                const texto = normalizarTextoMenu(link.textContent || link.innerText || "");
+                return texto.startsWith("CONSULTA AMB");
+            }) || null;
         });
     }
 
-    function forcarSubmenuConsultaAmb(menuPai) {
-        const eventos = ["mouseover", "mouseenter"];
-        const alvos = [menuPai];
+    function abrirMenuConsultaAmb(menuPai) {
+        const itemMenu = menuPai.closest("li") || menuPai;
+        const janela = menuPai.ownerDocument.defaultView;
 
-        // Superfish normalmente associa o hover ao link ou ao LI pai.
-        if (menuPai.parentElement) alvos.push(menuPai.parentElement);
-        const itemLista = menuPai.closest("li");
-        if (itemLista && !alvos.includes(itemLista)) alvos.push(itemLista);
-
-        alvos.forEach(function (alvo) {
-            eventos.forEach(function (tipo) {
-                alvo.dispatchEvent(new MouseEvent(tipo, {
-                    view: alvo.ownerDocument.defaultView,
-                    bubbles: tipo === "mouseover",
-                    cancelable: true,
-                    relatedTarget: null
-                }));
-            });
+        // Superfish abre o submenu ao receber o mouse sobre o LI pai.
+        ["mouseover", "mouseenter"].forEach(function (tipo) {
+            itemMenu.dispatchEvent(new janela.MouseEvent(tipo, {
+                view: janela,
+                bubbles: tipo === "mouseover",
+                cancelable: true,
+                relatedTarget: null
+            }));
         });
+
+        // Também dispara os eventos diretamente no link pai, como no uso real do mouse.
+        ["mouseover", "mouseenter"].forEach(function (tipo) {
+            menuPai.dispatchEvent(new janela.MouseEvent(tipo, {
+                view: janela,
+                bubbles: tipo === "mouseover",
+                cancelable: true,
+                relatedTarget: null
+            }));
+        });
+
+        return itemMenu;
     }
 
     function aguardarLinkSolicitacoes(documento, tempoMaximo) {
         return new Promise(function (resolve, reject) {
-            const inicio = Date.now();
             const seletor = 'a[href="/cgi-bin/gerenciador_solicitacao"]';
+            const inicio = Date.now();
 
             const timer = setInterval(function () {
+                // O link pode estar no DOM desde o início, mas oculto.
+                // Após o hover, clicamos no próprio link, sem simular clique no submenu.
                 const link = documento.querySelector(seletor);
                 if (link) {
                     clearInterval(timer);
@@ -553,7 +550,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 if (Date.now() - inicio >= tempoMaximo) {
                     clearInterval(timer);
                     reject(new Error(
-                        'O submenu foi acionado, mas não encontrei o link a[href="/cgi-bin/gerenciador_solicitacao"] no mesmo frame do menu CONSULTA AMB.'
+                        'Não encontrei o link de Solicitações no submenu CONSULTA AMB: ' + seletor
                     ));
                 }
             }, 150);
@@ -569,25 +566,31 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 jsonData: dadosResultado
             });
 
-            // Localiza CONSULTA AMB e força a abertura do submenu Superfish por hover.
+            // ETAPA 2: localizar e abrir CONSULTA AMB, da mesma forma que o menu CNS.
             const menuConsultaAmb = localizarMenuConsultaAmb();
             if (!menuConsultaAmb) {
-                throw new Error('Não localizei o elemento pai "CONSULTA AMB" no SISREG.');
+                throw new Error('Não localizei o link pai CONSULTA AMB (a.sf-with-ul).');
             }
 
-            forcarSubmenuConsultaAmb(menuConsultaAmb);
+            const itemMenu = abrirMenuConsultaAmb(menuConsultaAmb);
 
-            // O link é procurado no mesmo documento/frame do elemento pai.
-            // O click mantém o contexto de navegação definido pelo próprio link/SISREG.
+            // Aguarda o submenu Superfish ficar disponível no documento do menu.
             const linkSolicitacoes = await aguardarLinkSolicitacoes(
                 menuConsultaAmb.ownerDocument,
-                10000
+                5000
             );
 
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
             });
 
+            // Confirma que o link pertence ao submenu do item CONSULTA AMB.
+            const submenu = itemMenu.querySelector("ul.sf-menu");
+            if (submenu && !submenu.contains(linkSolicitacoes)) {
+                throw new Error("O link encontrado não pertence ao submenu de CONSULTA AMB.");
+            }
+
+            // O próprio HTML define target="f_principal". O click preserva esse destino.
             linkSolicitacoes.click();
 
             // Se a navegação for interna/AJAX, o campo será encontrado neste mesmo documento.
