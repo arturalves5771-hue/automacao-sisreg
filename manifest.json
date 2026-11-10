@@ -7,7 +7,8 @@
         "tabs",
         "storage",
         "downloads",
-        "webRequest"
+        "webRequest",
+        "webNavigation"
     ],
     "host_permissions": [
         "https://sisregiii.saude.gov.br/*",
@@ -19,15 +20,23 @@
     "content_scripts": [
         {
             "matches": [
-                "https://sisregiii.saude.gov.br/*",
-                "https://automacao-sisreg.vercel.app/*",
-                "file:///*"
+                "https://sisregiii.saude.gov.br/*"
             ],
             "js": [
                 "content.js"
             ],
             "run_at": "document_idle",
             "all_frames": true
+        },
+        {
+            "matches": [
+                "https://automacao-sisreg.vercel.app/*",
+                "file:///*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
         }
     ]
 }
