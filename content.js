@@ -17,6 +17,11 @@ window.addEventListener("message", function (event) {
         });
         return;
     }
+    if (event.data.type === "ABRIR_FICHA_CNS") {
+        const id = String(event.data.id || "").replace(/\D/g, "");
+        if (id) chrome.runtime.sendMessage({ type: "ABRIR_FICHA_CNS", id: id });
+        return;
+    }
 
     if (event.data.type === "SISREG_LOGIN") {
         if (!event.data.username || !event.data.password) return;
@@ -66,6 +71,14 @@ chrome.runtime.onMessage.addListener(function (message) {
             jsonData: message.jsonData,
             consultas: message.consultas || []
         }, "*");
+        return;
+    }
+    if (message.type === "DADOS_CNS_FICHA") {
+        window.postMessage({ type: "DADOS_CNS_FICHA", id: message.id, html: message.html || "" }, "*");
+        return;
+    }
+    if (message.type === "DADOS_CNS_FICHA_ERRO") {
+        window.postMessage({ type: "DADOS_CNS_FICHA_ERRO", mensagem: message.mensagem || "" }, "*");
         return;
     }
 
@@ -880,10 +893,52 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
     }
 
+
+    async function abrirFichaSolicitacaoCNS(id) {
+        const numero = String(id || "").replace(/\D/g, "");
+        const inicio = Date.now();
+        let linha = null;
+        while (!linha && Date.now() - inicio < 12000) {
+            linha = percorrerDocumentos(function (doc) {
+                return Array.from(doc.querySelectorAll("tr.linha_selecionavel")).find(function (tr) {
+                    const match = (tr.getAttribute("onclick") || "").match(/visualizaFicha\s*\(\s*['"]?(\d+)/i);
+                    return match && match[1] === numero;
+                }) || null;
+            });
+            if (!linha) await new Promise(resolve => setTimeout(resolve, 250));
+        }
+        if (!linha) {
+            chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"Não encontrei essa solicitação na tabela do SISREG. Faça novamente a consulta por CNS/CPF."});
+            return;
+        }
+        linha.click();
+        const inicioFicha = Date.now();
+        let tabelaFicha = null;
+        while (!tabelaFicha && Date.now() - inicioFicha < 18000) {
+            tabelaFicha = percorrerDocumentos(function (doc) {
+                return Array.from(doc.querySelectorAll("table.table_listagem")).find(function (tabela) {
+                    const texto = normalizarTextoMenu(tabela.innerText || tabela.textContent || "");
+                    return texto.includes("CHAVE DE CONFIRMACAO") ||
+                        (texto.includes("DADOS DO PACIENTE") && texto.includes("DADOS DA SOLICITACAO"));
+                }) || null;
+            });
+            if (!tabelaFicha) await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        if (!tabelaFicha) {
+            chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"O clique foi executado, mas a ficha detalhada não apareceu em até 18 segundos."});
+            return;
+        }
+        chrome.runtime.sendMessage({type:"FICHA_CNS_CAPTURADA",id:numero,html:tabelaFicha.outerHTML});
+    }
+
     chrome.runtime.onMessage.addListener(function (message) {
         if (message.type === "EXECUTAR_CONSULTA_CNS") {
             consultaCNSResultadoEnviado = false;
             executarConsultaCNS(message.numero);
+            return;
+        }
+        if (message.type === "ABRIR_FICHA_CNS") {
+            abrirFichaSolicitacaoCNS(message.id);
             return;
         }
 
