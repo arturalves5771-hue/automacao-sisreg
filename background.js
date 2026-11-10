@@ -139,7 +139,11 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                     } catch (e) {}
                 }
                 await chrome.storage.session.set({ operacaoAtual: null });
-                await chrome.storage.session.remove(["consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"]);
+                await chrome.storage.session.remove([
+            "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
+            "consultaCNSAguardandoResultado", "consultaCNSResultado",
+            "consultaCNSNumeroEncontrado", "consultaEtapa"
+        ]);
                 setTimeout(async () => { try { await chrome.tabs.remove(tabId); } catch (e) {} }, 500);
                 return;
             }
