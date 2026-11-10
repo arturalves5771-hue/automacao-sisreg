@@ -979,21 +979,58 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"Não encontrei essa solicitação na tabela do SISREG. Faça novamente a consulta por CNS/CPF."});
             return;
         }
+        // Guarda as fichas que já estavam no DOM antes do clique.
+        // Ao voltar à tabela, o SISREG pode manter a ficha anterior oculta;
+        // sem esta comparação, a busca pode capturar novamente o registro antigo.
+        const fichasAnteriores = new Map();
+        percorrerDocumentos(function (doc) {
+            Array.from(doc.querySelectorAll("table.table_listagem")).forEach(function (tabela) {
+                const texto = normalizarTextoMenu(tabela.innerText || tabela.textContent || "");
+                if (texto.includes("CHAVE DE CONFIRMACAO") ||
+                    (texto.includes("DADOS DO PACIENTE") && texto.includes("DADOS DA SOLICITACAO"))) {
+                    fichasAnteriores.set(tabela, tabela.outerHTML);
+                }
+            });
+            return null;
+        });
+
         linha.click();
+
         const inicioFicha = Date.now();
         let tabelaFicha = null;
-        while (!tabelaFicha && Date.now() - inicioFicha < 18000) {
-            tabelaFicha = percorrerDocumentos(function (doc) {
+        let htmlCandidato = "";
+        let estabilidadeDesde = 0;
+
+        while (Date.now() - inicioFicha < 18000) {
+            const candidata = percorrerDocumentos(function (doc) {
                 return Array.from(doc.querySelectorAll("table.table_listagem")).find(function (tabela) {
                     const texto = normalizarTextoMenu(tabela.innerText || tabela.textContent || "");
-                    return texto.includes("CHAVE DE CONFIRMACAO") ||
+                    const pareceFicha = texto.includes("CHAVE DE CONFIRMACAO") ||
                         (texto.includes("DADOS DO PACIENTE") && texto.includes("DADOS DA SOLICITACAO"));
+                    if (!pareceFicha) return false;
+
+                    // Só aceita uma ficha criada agora ou cujo conteúdo mudou
+                    // depois do clique na solicitação selecionada.
+                    return !fichasAnteriores.has(tabela) ||
+                        fichasAnteriores.get(tabela) !== tabela.outerHTML;
                 }) || null;
             });
-            if (!tabelaFicha) await new Promise(resolve => setTimeout(resolve, 300));
+
+            if (candidata) {
+                const htmlAtual = candidata.outerHTML;
+                if (candidata !== tabelaFicha || htmlAtual !== htmlCandidato) {
+                    tabelaFicha = candidata;
+                    htmlCandidato = htmlAtual;
+                    estabilidadeDesde = Date.now();
+                } else if (Date.now() - estabilidadeDesde >= 500) {
+                    break;
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
         }
-        if (!tabelaFicha) {
-            chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"O clique foi executado, mas a ficha detalhada não apareceu em até 18 segundos."});
+
+        if (!tabelaFicha || Date.now() - estabilidadeDesde < 500) {
+            chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"O SISREG não apresentou uma ficha nova para esta solicitação. Volte à tabela e tente novamente; se persistir, atualize a consulta por CNS/CPF."});
             return;
         }
         // Captura a ficha inteira, incluindo o título/rodapé da área original.
