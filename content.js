@@ -63,7 +63,8 @@ chrome.runtime.onMessage.addListener(function (message) {
     if (message.type === "DADOS_CNS_SUCESSO") {
         window.postMessage({
             type: "DADOS_CNS_SUCESSO",
-            jsonData: message.jsonData
+            jsonData: message.jsonData,
+            consultas: message.consultas || []
         }, "*");
         return;
     }
@@ -468,6 +469,153 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         campo.blur();
     }
 
+    function normalizarCabecalhoSolicitacao(valor) {
+        return normalizarTextoMenu(valor).replace(/[^A-Z0-9]/g, "");
+    }
+
+    function extrairValorDoTituloSolicitacao(titulos, rotulos) {
+        const texto = String(titulos || "").replace(/\r/g, "\n");
+        const proximos = "(?:Número CNS|Nome Paciente|Nome da Mãe|Data Nascimento|Data de Nascimento|Descrição CID|CID|Descrição)";
+        for (const rotulo of rotulos) {
+            const padrao = new RegExp("(?:^|[\\n;|])\\s*" + rotulo +
+                "\\s*[:：\\-]?\\s*([\\s\\S]*?)(?=\\s*(?:\\n|;|\\||" + proximos + ")\\s*[:：\\-]|$)", "i");
+            const achado = texto.match(padrao);
+            if (achado && achado[1]) return achado[1].trim().replace(/\s+/g, " ");
+        }
+        return "";
+    }
+
+    function extrairConsultasSolicitacoes(documento) {
+        const doc = documento || document;
+        const linhas = Array.from(doc.querySelectorAll("tr.linha_selecionavel"));
+        const resultado = [];
+        const ids = new Set();
+
+        linhas.forEach(function (linha) {
+            const celulas = Array.from(linha.querySelectorAll("td"));
+            if (!celulas.length) return;
+
+            const onclick = [
+                linha.getAttribute("onclick") || "",
+                ...Array.from(linha.querySelectorAll("[onclick]")).map(function (el) {
+                    return el.getAttribute("onclick") || "";
+                })
+            ].join(" ");
+            const idMatch = onclick.match(/visualizaFicha\s*\(\s*['"]?(\d+)/i);
+            const textos = celulas.map(function (celula) {
+                return (celula.innerText || celula.textContent || "").trim().replace(/\s+/g, " ");
+            });
+            const idVisivel = textos.join(" ").match(/\b(\d{6,})\b/);
+            const id = idMatch ? idMatch[1] : (idVisivel ? idVisivel[1] : "");
+            const assinatura = id || textos.join("|");
+            if (ids.has(assinatura)) return;
+            ids.add(assinatura);
+
+            const tabela = linha.closest("table");
+            let cabecalhos = [];
+            if (tabela) {
+                const linhaCabecalho = tabela.querySelector("thead tr") ||
+                    Array.from(tabela.querySelectorAll("tr")).find(function (tr) {
+                        return tr.querySelector("th");
+                    });
+                if (linhaCabecalho) {
+                    cabecalhos = Array.from(linhaCabecalho.querySelectorAll("th,td")).map(function (celula) {
+                        return (celula.innerText || celula.textContent || "").trim();
+                    });
+                }
+            }
+
+            const valores = {};
+            cabecalhos.forEach(function (cabecalho, indice) {
+                if (indice < textos.length && cabecalho) {
+                    valores[normalizarCabecalhoSolicitacao(cabecalho)] = textos[indice];
+                }
+            });
+
+            function porCabecalho(aliases) {
+                const chaves = Object.keys(valores);
+                for (const alias of aliases) {
+                    const alvo = normalizarCabecalhoSolicitacao(alias);
+                    const chave = chaves.find(function (item) {
+                        return item === alvo || item.includes(alvo);
+                    });
+                    if (chave && valores[chave]) return valores[chave];
+                }
+                return "";
+            }
+
+            const titulos = celulas.map(function (celula) {
+                return celula.getAttribute("title") || "";
+            }).filter(Boolean).join("\n");
+            const tituloCID = celulas.map(function (celula, indice) {
+                const cab = normalizarCabecalhoSolicitacao(cabecalhos[indice] || "");
+                return cab.includes("CID") ? (celula.getAttribute("title") || "") : "";
+            }).filter(Boolean).join(" ");
+
+            const cnsTitulo = extrairValorDoTituloSolicitacao(titulos, ["Número CNS"]);
+            const nascimentoTitulo = extrairValorDoTituloSolicitacao(titulos, ["Data Nascimento", "Data de Nascimento"]);
+            const descricaoTitulo = extrairValorDoTituloSolicitacao(tituloCID || titulos, ["Descrição CID", "Descrição"]) ||
+                String(tituloCID || "").trim();
+
+            resultado.push({
+                id: id,
+                cns: (cnsTitulo.match(/\d{15}/) || [porCabecalho(["CNS"])])[0] || "",
+                dataNascimento: nascimentoTitulo,
+                dataSolicitacao: porCabecalho(["Data Solicitação", "Data da Solicitação"]),
+                municipio: porCabecalho(["Município", "Municipio"]),
+                idade: porCabecalho(["Idade"]),
+                procedimento: porCabecalho(["Procedimento"]),
+                cid: porCabecalho(["CID"]),
+                cidDescricao: descricaoTitulo,
+                solicitante: porCabecalho(["Solicitante"]),
+                executante: porCabecalho(["Executante"]),
+                dataAgendamento: porCabecalho(["Data Agendamento", "Data do Agendamento"]),
+                situacao: porCabecalho(["Situação", "Situacao"])
+            });
+        });
+        return resultado;
+    }
+
+    function localizarBotaoPesquisaSolicitacoes(campo) {
+        const formulario = campo.form || campo.closest("form");
+        const candidatos = formulario
+            ? Array.from(formulario.querySelectorAll("button,input[type='submit'],input[type='button'],input[type='image'],[onclick]"))
+            : Array.from(campo.ownerDocument.querySelectorAll("button,input[type='submit'],input[type='button'],input[type='image'],[onclick]"));
+
+        return candidatos.find(function (elemento) {
+            const texto = normalizarTextoMenu(
+                (elemento.innerText || elemento.textContent || "") + " " +
+                (elemento.value || "") + " " +
+                (elemento.getAttribute("title") || "") + " " +
+                (elemento.getAttribute("alt") || "") + " " +
+                (elemento.getAttribute("name") || "")
+            );
+            return /PESQUISAR|CONSULTAR|BUSCAR|FILTRAR/.test(texto);
+        }) || (formulario ? formulario.querySelector("button[type='submit'],input[type='submit']") : null);
+    }
+
+    function aguardarResultadoConsultas(documento, tempoMaximo) {
+        return new Promise(function (resolve) {
+            const inicio = Date.now();
+            const timer = setInterval(function () {
+                const documentoAtual = percorrerDocumentos(function (doc) {
+                    const encontrouLinhas = doc.querySelectorAll("tr.linha_selecionavel").length > 0;
+                    const textoDoc = doc.body ? normalizarTextoMenu(doc.body.innerText) : "";
+                    const semResultadoDoc = /NENHUM(A)? (REGISTRO|SOLICITACAO|RESULTADO)|NAO FORAM ENCONTRAD/.test(textoDoc);
+                    return encontrouLinhas || semResultadoDoc ? doc : null;
+                }) || (buscarElementoSISREG('input[name="cns_paciente"]') || {}).ownerDocument || documento;
+
+                const linhas = documentoAtual.querySelectorAll("tr.linha_selecionavel");
+                const texto = documentoAtual.body ? normalizarTextoMenu(documentoAtual.body.innerText) : "";
+                const semResultado = /NENHUM(A)? (REGISTRO|SOLICITACAO|RESULTADO)|NAO FORAM ENCONTRAD/.test(texto);
+                if (linhas.length || semResultado || Date.now() - inicio >= tempoMaximo) {
+                    clearInterval(timer);
+                    resolve(extrairConsultasSolicitacoes(documentoAtual));
+                }
+            }, 350);
+        });
+    }
+
     async function concluirPreenchimentoSolicitacoes(cns) {
         if (preenchimentoSolicitacoesEmAndamento) return;
         preenchimentoSolicitacoesEmAndamento = true;
@@ -482,6 +630,23 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_SOLICITACOES_PRONTA" });
             preencherCampoComEventos(campoCNS, cns);
 
+            const documento = campoCNS.ownerDocument;
+            const botaoPesquisar = localizarBotaoPesquisaSolicitacoes(campoCNS);
+            if (botaoPesquisar) {
+                botaoPesquisar.click();
+            } else if (campoCNS.form) {
+                ["keydown", "keypress", "keyup"].forEach(function (tipo) {
+                    campoCNS.dispatchEvent(new KeyboardEvent(tipo, {
+                        key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true
+                    }));
+                });
+            }
+
+            const consultas = await aguardarResultadoConsultas(documento, 20000);
+            await chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_CONSULTAS_CAPTURADAS",
+                consultas: consultas
+            });
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_PREENCHIMENTO_CONCLUIDO"
             });
