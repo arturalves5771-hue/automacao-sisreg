@@ -1183,14 +1183,15 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
 
         if (message.type === "CAPTURAR_RESULTADO_CNS") {
+            // Esta mensagem é uma tentativa complementar disparada pelo background
+            // após o carregamento. O resultado do CADWEB pode aparecer alguns instantes
+            // depois; a execução original já possui uma espera própria de até 25 segundos.
+            // Portanto, não gerar erro imediato se o resultado ainda não estiver no DOM.
+            if (resultadoCNSProcessado) return;
+
             const docResultado = localizarDocumentoResultado();
             if (docResultado) {
                 processarResultadoInicial(docResultado);
-            } else {
-                chrome.runtime.sendMessage({
-                    type: "CONSULTA_CNS_ERRO",
-                    mensagem: "A página terminou de carregar, mas não encontrei o resultado da pesquisa inicial do CADWEB."
-                });
             }
             return;
         }
