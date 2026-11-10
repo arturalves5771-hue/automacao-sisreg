@@ -402,8 +402,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         await chrome.storage.session.set({ operacaoAtual: null });
         await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
-            "consultaCNSAguardandoResultado", "consultaCNSResultado",
-            "consultaCNSNumeroEncontrado", "consultaCNSConsultas", "consultaEtapa"
+            "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
         ]);
 
         // A aba do SISREG permanece aberta em segundo plano para abrir as fichas selecionadas.
