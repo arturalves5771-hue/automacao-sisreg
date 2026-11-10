@@ -552,7 +552,8 @@ button:disabled{
  button:hover:not(:disabled),button:active:not(:disabled){transform:none}
 }
 
-    </style>
+    .ficha-sisreg-original{width:100%;overflow-x:auto;background:#fff;padding:8px}.ficha-sisreg-original table{max-width:100%;border-collapse:collapse}.ficha-sisreg-original img{max-width:100%;height:auto}
+</style>
 <style>
 /* Informações do paciente + tabela CONSULTAS */
 .titulo-info-paciente{margin:0 0 14px;color:var(--brand-900);font-size:11px;font-weight:800;letter-spacing:1.15px}
@@ -1249,30 +1250,35 @@ function exibirFichaCNS(html, id) {
     const documento = new DOMParser().parseFromString(String(html || ""), "text/html");
     const original = documento.querySelector("table.table_listagem");
     conteudoFichaCNS.replaceChildren();
-    if (!original) { conteudoFichaCNS.textContent = "Não foi possível interpretar a ficha recebida."; return; }
-    const tabela = document.createElement("table");
-    tabela.className = "tabela-ficha-cns";
-    const tbody = document.createElement("tbody");
-    Array.from(original.querySelectorAll("tr")).forEach(function (trOriginal) {
-        const celulas = Array.from(trOriginal.children).filter(el => el.tagName === "TD" || el.tagName === "TH");
-        if (!celulas.length) return;
-        const tr = document.createElement("tr");
-        celulas.forEach(function (celulaOriginal) {
-            const celula = document.createElement(celulaOriginal.tagName.toLowerCase());
-            celula.textContent = (celulaOriginal.innerText || celulaOriginal.textContent || "").trim();
-            if (celulaOriginal.hasAttribute("colspan")) celula.colSpan = Number(celulaOriginal.getAttribute("colspan")) || 1;
-            if (celulaOriginal.hasAttribute("rowspan")) celula.rowSpan = Number(celulaOriginal.getAttribute("rowspan")) || 1;
-            tr.appendChild(celula);
-        });
-        tbody.appendChild(tr);
+    if (!original) {
+        conteudoFichaCNS.textContent = "Não foi possível interpretar a ficha recebida.";
+        return;
+    }
+
+    // Reproduz a tabela original capturada no SISREG, preservando estrutura e estilos.
+    original.querySelectorAll("script,iframe,object,embed").forEach(function (elemento) {
+        elemento.remove();
     });
-    tabela.appendChild(tbody);
-    conteudoFichaCNS.appendChild(tabela);
+    [original, ...Array.from(original.querySelectorAll("*"))].forEach(function (elemento) {
+        Array.from(elemento.attributes || []).forEach(function (atributo) {
+            if (atributo.name.toLowerCase().startsWith("on")) elemento.removeAttribute(atributo.name);
+            if ((atributo.name === "href" || atributo.name === "src") && /^\\s*javascript:/i.test(atributo.value)) {
+                elemento.removeAttribute(atributo.name);
+            }
+        });
+    });
+
+    const moldura = document.createElement("div");
+    moldura.className = "ficha-sisreg-original";
+    moldura.appendChild(document.importNode(original, true));
+    conteudoFichaCNS.appendChild(moldura);
     identificadorFichaCNS.textContent = "SOLICITAÇÃO Nº " + id;
 }
 btnVoltarConsultasCNS.addEventListener("click", function () {
     telaFichaCNS.classList.add("oculto");
     resumoPacienteCNS.classList.remove("oculto");
+    conteudoFichaCNS.textContent = "⏳ Retornando às solicitações do SISREG...";
+    window.postMessage({type:"RETORNAR_SOLICITACOES_CNS"},"*");
 });
 window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
