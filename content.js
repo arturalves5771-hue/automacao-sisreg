@@ -555,6 +555,16 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 return "";
             }
 
+            function porCabecalhoDataExecucao() {
+                const chaves = Object.keys(valores);
+                const chave = chaves.find(function (item) {
+                    return ((item.includes("EXEC") && !item.includes("EXECUTANTE")) ||
+                        item.includes("REALIZACAO") || item.includes("REALIZADA")) &&
+                        valores[item];
+                });
+                return chave ? valores[chave] : "";
+            }
+
             const titulos = celulas.map(function (celula) {
                 return celula.getAttribute("title") || "";
             }).filter(Boolean).join("\n");
@@ -580,7 +590,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 cidDescricao: descricaoTitulo,
                 solicitante: porCabecalho(["Solicitante"]),
                 executante: porCabecalho(["Executante"]),
-                dataExecucao: porCabecalho(["Data Execução", "Data da Execução", "Data de Execução", "Data Realização", "Data da Realização"]),
+                dataExecucao: porCabecalho(["Data Execução", "Data da Execução", "Data de Execução", "Dt Execução", "Data Realização", "Data da Realização"]) || porCabecalhoDataExecucao(),
                 situacao: porCabecalho(["Situação", "Situacao"])
             });
         });
