@@ -22,6 +22,10 @@ window.addEventListener("message", function (event) {
         if (id) chrome.runtime.sendMessage({ type: "ABRIR_FICHA_CNS", id: id });
         return;
     }
+    if (event.data.type === "RETORNAR_SOLICITACOES_CNS") {
+        chrome.runtime.sendMessage({ type: "RETORNAR_SOLICITACOES_CNS" });
+        return;
+    }
 
     if (event.data.type === "SISREG_LOGIN") {
         if (!event.data.username || !event.data.password) return;
@@ -928,7 +932,31 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             chrome.runtime.sendMessage({type:"FICHA_CNS_ERRO",id:numero,mensagem:"O clique foi executado, mas a ficha detalhada não apareceu em até 18 segundos."});
             return;
         }
-        chrome.runtime.sendMessage({type:"FICHA_CNS_CAPTURADA",id:numero,html:tabelaFicha.outerHTML});
+        const copiaFicha = tabelaFicha.cloneNode(true);
+        const originais = [tabelaFicha, ...Array.from(tabelaFicha.querySelectorAll("*"))];
+        const copias = [copiaFicha, ...Array.from(copiaFicha.querySelectorAll("*"))];
+        originais.forEach(function (original, indice) {
+            const copia = copias[indice];
+            if (!copia) return;
+            try {
+                const estilo = original.ownerDocument.defaultView.getComputedStyle(original);
+                const declaracoes = [];
+                for (let i = 0; i < estilo.length; i++) {
+                    const propriedade = estilo[i];
+                    declaracoes.push(propriedade + ":" + estilo.getPropertyValue(propriedade));
+                }
+                copia.setAttribute("style", declaracoes.join(";"));
+            } catch (erro) {}
+            Array.from(copia.attributes || []).forEach(function (atributo) {
+                if (/^on/i.test(atributo.name)) copia.removeAttribute(atributo.name);
+            });
+            if (copia.tagName === "IMG") {
+                const origem = original.getAttribute("src");
+                if (origem) copia.setAttribute("src", new URL(origem, original.ownerDocument.location.href).href);
+            }
+        });
+        copiaFicha.querySelectorAll("script,iframe,object,embed").forEach(function (elemento) { elemento.remove(); });
+        chrome.runtime.sendMessage({type:"FICHA_CNS_CAPTURADA",id:numero,html:copiaFicha.outerHTML});
     }
 
     chrome.runtime.onMessage.addListener(function (message) {
@@ -939,6 +967,12 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
         if (message.type === "ABRIR_FICHA_CNS") {
             abrirFichaSolicitacaoCNS(message.id);
+            return;
+        }
+        if (message.type === "RETORNAR_SOLICITACOES_CNS") {
+            resultadoCNSProcessado = true;
+            preenchimentoSolicitacoesEmAndamento = false;
+            abrirSolicitacoesEPreencher(message.cns, message.jsonData || {});
             return;
         }
 
