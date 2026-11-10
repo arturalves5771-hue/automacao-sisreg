@@ -626,11 +626,11 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
                     <div class="tabela-consultas-wrapper">
                         <table class="tabela-consultas-cns">
                             <thead><tr>
-                                <th>ID</th><th>Data solicitação</th><th>Procedimento</th><th>CID / Descrição</th>
-                                <th>Solicitante</th><th>Executante</th><th>Data agendamento</th><th>Situação</th>
+                                <th>Data solicitação</th><th>Procedimento</th><th>CID / Descrição</th>
+                                <th>Solicitante</th><th>Executante</th><th>Data execução</th><th>Situação</th>
                             </tr></thead>
                             <tbody id="corpoTabelaConsultasCNS">
-                                <tr><td colspan="12" class="estado-vazio-consultas">Aguardando dados do SISREG III...</td></tr>
+                                <tr><td colspan="7" class="estado-vazio-consultas">Aguardando dados do SISREG III...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1172,7 +1172,7 @@ function renderizarConsultasCNS(consultas) {
     if (!lista.length) {
         const linha = document.createElement("tr");
         const celula = document.createElement("td");
-        celula.colSpan = 8;
+        celula.colSpan = 7;
         celula.className = "estado-vazio-consultas";
         celula.textContent = "Nenhuma consulta encontrada para este CNS.";
         linha.appendChild(celula);
@@ -1183,15 +1183,14 @@ function renderizarConsultasCNS(consultas) {
     lista.forEach(function (consulta) {
         const linha = document.createElement("tr");
         const valores = [
-            consulta.id, consulta.dataSolicitacao, consulta.procedimento,
+            consulta.dataSolicitacao, consulta.procedimento,
             [consulta.cid, consulta.cidDescricao].filter(Boolean).join(" — "),
-            consulta.solicitante, consulta.executante, consulta.dataAgendamento, consulta.situacao
+            consulta.solicitante, consulta.executante, consulta.dataExecucao, consulta.situacao
         ];
         valores.forEach(function (valor, indice) {
             const celula = document.createElement("td");
             celula.textContent = valor == null || valor === "" ? "—" : String(valor);
-            if (indice === 0) celula.className = "col-id";
-            if (indice === 11) celula.className = "col-situacao";
+            if (indice === 6) celula.className = "col-situacao";
             linha.appendChild(celula);
         });
         corpoTabelaConsultasCNS.appendChild(linha);
