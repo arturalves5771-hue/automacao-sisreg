@@ -300,22 +300,248 @@ if (location.hostname === "sisregiii.saude.gov.br") {
     }
 
     let consultaCNSResultadoEnviado = false;
+    let resultadoCNSProcessado = false;
+    let preenchimentoSolicitacoesEmAndamento = false;
 
-    function enviarResultadoCNS(documento) {
+    function enviarResultadoCNS(dados) {
         if (consultaCNSResultadoEnviado) return;
         consultaCNSResultadoEnviado = true;
 
         chrome.runtime.sendMessage({
             type: "DADOS_CNS_SUCESSO",
-            jsonData: extrairDadosPaginaCNS(documento)
+            jsonData: dados
         });
+    }
+
+    function extrairNumeroCNS(dados, numeroOriginal) {
+        const original = String(numeroOriginal || "").replace(/\D/g, "");
+        if (original.length === 15) return original;
+
+        // Primeiro tenta localizar o CNS nos campos estruturados do CADWEB.
+        if (dados && Array.isArray(dados.campos)) {
+            for (const item of dados.campos) {
+                const rotulo = String(item.campo || "");
+                const valor = String(item.valor || "").replace(/\D/g, "");
+                if (/(CNS|CART[AÃ]O.*SUS|CART[AÃ]O NACIONAL)/i.test(rotulo) && valor.length === 15) {
+                    return valor;
+                }
+            }
+        }
+
+        // Depois procura o CNS identificado no texto bruto da página.
+        const texto = String(dados && dados.texto || "");
+        const padroes = [
+            /(?:CNS|Cart[aã]o\s*(?:Nacional\s*)?de?\s*Sa[uú]de)\s*[:\-]?\s*(\d{3}\s*\d{4}\s*\d{4}\s*\d{4})/i,
+            /(?:CNS|Cart[aã]o\s*(?:Nacional\s*)?de?\s*Sa[uú]de)[\s\S]{0,80}?(\d{15})/i
+        ];
+
+        for (const padrao of padroes) {
+            const resultado = texto.match(padrao);
+            if (resultado) {
+                const numero = resultado[1].replace(/\D/g, "");
+                if (numero.length === 15) return numero;
+            }
+        }
+
+        // Última alternativa: procura uma sequência de 15 dígitos no texto.
+        const sequencias = texto.match(/\b\d{15}\b/g) || [];
+        return sequencias.length === 1 ? sequencias[0] : "";
+    }
+
+    function normalizarTextoMenu(texto) {
+        return String(texto || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toUpperCase();
+    }
+
+    function localizarOpcaoMenuSISREG(tipo) {
+        const seletor = "a, button, input[type='button'], input[type='submit'], [onclick], [role='menuitem'], td, span";
+        return percorrerDocumentos(function (doc) {
+            const elementos = Array.from(doc.querySelectorAll(seletor));
+            const encontrados = elementos.filter(function (elemento) {
+                const texto = normalizarTextoMenu(elemento.innerText || elemento.textContent || elemento.value || elemento.getAttribute("title"));
+                if (!texto) return false;
+
+                if (tipo === "consulta_amb") {
+                    return texto === "CONSULTA AMB";
+                }
+
+                return texto === "SOLICITACOES" ||
+                    texto === "SOLICITACOES AMBULATORIAIS" ||
+                    texto.startsWith("SOLICITACOES ");
+            });
+
+            // Prioriza o elemento com o texto mais específico/curto.
+            encontrados.sort(function (a, b) {
+                const ta = (a.innerText || a.textContent || a.value || "").trim().length;
+                const tb = (b.innerText || b.textContent || b.value || "").trim().length;
+                return ta - tb;
+            });
+
+            return encontrados[0] || null;
+        });
+    }
+
+    function aguardarElementoSISREG(seletor, tempoMaximo, mensagemErro) {
+        return new Promise(function (resolve, reject) {
+            const inicio = Date.now();
+            const timer = setInterval(function () {
+                const elemento = buscarElementoSISREG(seletor);
+                if (elemento) {
+                    clearInterval(timer);
+                    resolve(elemento);
+                    return;
+                }
+
+                if (Date.now() - inicio >= tempoMaximo) {
+                    clearInterval(timer);
+                    reject(new Error(mensagemErro || "Tempo esgotado aguardando o elemento do SISREG: " + seletor));
+                }
+            }, 300);
+        });
+    }
+
+    function aguardarOpcaoMenuSISREG(tipo, tempoMaximo) {
+        return new Promise(function (resolve, reject) {
+            const inicio = Date.now();
+            const timer = setInterval(function () {
+                const elemento = localizarOpcaoMenuSISREG(tipo);
+                if (elemento) {
+                    clearInterval(timer);
+                    resolve(elemento);
+                    return;
+                }
+
+                if (Date.now() - inicio >= tempoMaximo) {
+                    clearInterval(timer);
+                    reject(new Error(tipo === "consulta_amb"
+                        ? "Não localizei o menu superior CONSULTA AMB."
+                        : "Não localizei a opção SOLICITAÇÕES dentro do menu CONSULTA AMB."));
+                }
+            }, 300);
+        });
+    }
+
+    function preencherCampoComEventos(campo, valor) {
+        const numero = String(valor || "").replace(/\D/g, "");
+        if (!campo || numero.length !== 15) {
+            throw new Error("O CNS capturado não possui 15 dígitos. O campo não será preenchido.");
+        }
+
+        campo.focus();
+        campo.value = numero;
+
+        // Dispara os eventos usuais de atualização do formulário.
+        campo.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // A tela do SISREG usa onkeypress e onkeyup para atualizar a validação.
+        for (const digito of numero) {
+            const codigo = Number(digito);
+            campo.dispatchEvent(new KeyboardEvent("keypress", {
+                key: digito,
+                code: "Digit" + digito,
+                keyCode: 48 + codigo,
+                which: 48 + codigo,
+                bubbles: true,
+                cancelable: true
+            }));
+            campo.dispatchEvent(new KeyboardEvent("keyup", {
+                key: digito,
+                code: "Digit" + digito,
+                keyCode: 48 + codigo,
+                which: 48 + codigo,
+                bubbles: true
+            }));
+        }
+
+        // O evento change executa o onchange="atualizarIndicadorCampoObrigatorio()".
+        campo.dispatchEvent(new Event("change", { bubbles: true }));
+        campo.blur();
+    }
+
+    async function concluirPreenchimentoSolicitacoes(cns) {
+        if (preenchimentoSolicitacoesEmAndamento) return;
+        preenchimentoSolicitacoesEmAndamento = true;
+
+        try {
+            const campoCNS = await aguardarElementoSISREG(
+                'input[name="cns_paciente"]',
+                25000,
+                "A página de Solicitações Ambulatoriais foi aberta, mas o campo input[name='cns_paciente'] não apareceu em até 25 segundos."
+            );
+
+            await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_SOLICITACOES_PRONTA" });
+            preencherCampoComEventos(campoCNS, cns);
+
+            await chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_PREENCHIMENTO_CONCLUIDO"
+            });
+        } catch (erro) {
+            chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_ERRO",
+                mensagem: erro.message || "Não foi possível preencher o CNS na tela de Solicitações Ambulatoriais."
+            });
+        }
+    }
+
+    async function abrirSolicitacoesEPreencher(cns, dadosResultado) {
+        try {
+            // Guarda o resultado e prepara o background para eventual navegação/reload.
+            await chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_RESULTADO_CAPTURADO",
+                cns: cns,
+                jsonData: dadosResultado
+            });
+
+            const menuConsulta = await aguardarOpcaoMenuSISREG("consulta_amb", 12000);
+            menuConsulta.click();
+
+            // Aguarda o submenu ser renderizado após o clique no menu superior.
+            const opcaoSolicitacoes = await aguardarOpcaoMenuSISREG("solicitacoes", 12000);
+
+            await chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
+            });
+
+            opcaoSolicitacoes.click();
+
+            // Se a navegação for interna/AJAX, o campo será encontrado neste mesmo documento.
+            // Se houver recarregamento completo, background.js retomará o preenchimento.
+            await concluirPreenchimentoSolicitacoes(cns);
+        } catch (erro) {
+            chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_ERRO",
+                mensagem: erro.message || "Não foi possível abrir CONSULTA AMB > SOLICITAÇÕES."
+            });
+        }
+    }
+
+    async function processarResultadoInicial(documento) {
+        if (resultadoCNSProcessado) return;
+        resultadoCNSProcessado = true;
+
+        const dados = extrairDadosPaginaCNS(documento);
+        const cns = extrairNumeroCNS(dados, "");
+
+        if (!cns || cns.length !== 15) {
+            chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_ERRO",
+                mensagem: "A pesquisa inicial foi concluída, mas não consegui identificar um Cartão do SUS com 15 dígitos no resultado do CADWEB."
+            });
+            return;
+        }
+
+        await abrirSolicitacoesEPreencher(cns, dados);
     }
 
     async function executarConsultaCNS(numero) {
         try {
             let campo = buscarElementoSISREG('input[name="nu_cns"]');
 
-            /* Se necessário, abre a opção CNS, inclusive quando estiver em um frame. */
+            // Primeira etapa: abrir a opção CNS para pesquisar o CPF ou CNS informado.
             if (!campo) {
                 const opcaoCNS = percorrerDocumentos(function (doc) {
                     const opcoes = Array.from(doc.querySelectorAll("a, button, input[type='button'], input[type='submit']"));
@@ -332,16 +558,19 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
                 await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
                 opcaoCNS.click();
-                campo = await aguardarElementoCNS('input[name="nu_cns"]', 20000);
+                campo = await aguardarElementoSISREG(
+                    'input[name="nu_cns"]',
+                    20000,
+                    "Não encontrei input[name='nu_cns'] após abrir a opção CNS."
+                );
             }
 
             const docConsulta = campo.ownerDocument;
             campo.focus();
-            campo.value = numero;
+            campo.value = String(numero || "").replace(/\D/g, "");
             campo.dispatchEvent(new Event("input", { bubbles: true }));
             campo.dispatchEvent(new Event("change", { bubbles: true }));
 
-            /* Usa exatamente o botão Pesquisar informado no HTML do CADWEB. */
             const botaoPesquisar = docConsulta.querySelector('input[name="btn_pesquisar"]');
             if (!botaoPesquisar) {
                 throw new Error("Encontrei o campo nu_cns, mas não encontrei input[name='btn_pesquisar'] na mesma tela.");
@@ -350,13 +579,14 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_PESQUISA_ENVIADA" });
             botaoPesquisar.click();
 
-            /* Aguarda o resultado real, inclusive quando a pesquisa ocorre por JavaScript/AJAX. */
+            // Aguarda resultado por AJAX. Se a pesquisa recarregar a página,
+            // background.js enviará CAPTURAR_RESULTADO_CNS após o carregamento.
             const inicio = Date.now();
             const timer = setInterval(function () {
                 const docResultado = localizarDocumentoResultado();
                 if (docResultado) {
                     clearInterval(timer);
-                    enviarResultadoCNS(docResultado);
+                    processarResultadoInicial(docResultado);
                     return;
                 }
 
@@ -388,7 +618,21 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
         if (message.type === "CAPTURAR_RESULTADO_CNS") {
             const docResultado = localizarDocumentoResultado();
-            enviarResultadoCNS(docResultado || document);
+            if (docResultado) {
+                processarResultadoInicial(docResultado);
+            } else {
+                chrome.runtime.sendMessage({
+                    type: "CONSULTA_CNS_ERRO",
+                    mensagem: "A página terminou de carregar, mas não encontrei o resultado da pesquisa inicial do CADWEB."
+                });
+            }
+            return;
+        }
+
+        if (message.type === "PREENCHER_CNS_SOLICITACOES") {
+            resultadoCNSProcessado = true;
+            concluirPreenchimentoSolicitacoes(message.cns);
+            return;
         }
     });
 
