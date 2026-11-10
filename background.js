@@ -391,10 +391,9 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         });
         try {
             await chrome.tabs.sendMessage(dados.abaSISREG, {
-                type: "RETORNAR_SOLICITACOES_CNS",
-                cns: dados.cnsSolicitacoesAtual,
-                jsonData: dados.dadosPacienteCNSAtual || {}
-            });
+                type: "PREENCHER_CNS_SOLICITACOES",
+                cns: dados.cnsSolicitacoesAtual
+            }, { frameId: 1 });
         } catch (erro) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -627,7 +626,7 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
                 await chrome.tabs.sendMessage(tabId, {
                     type: "PREENCHER_CNS_SOLICITACOES",
                     cns: dados.consultaCNSNumeroEncontrado
-                });
+                }, { frameId: 1 });
             } catch (e) {
                 console.error("Não foi possível retomar o preenchimento do CNS em Solicitações:", e);
             }
