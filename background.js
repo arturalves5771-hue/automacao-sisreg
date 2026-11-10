@@ -1,16 +1,3 @@
-async function localizarFrameSolicitacoes(tabId) {
-    try {
-        const frames = await chrome.webNavigation.getAllFrames({ tabId: tabId });
-        const frame = (frames || []).find(function (item) {
-            return String(item.url || "").includes("/cgi-bin/gerenciador_solicitacao");
-        });
-        return frame ? frame.frameId : null;
-    } catch (erro) {
-        console.error("Não foi possível identificar o frame de Solicitações:", erro);
-        return null;
-    }
-}
-
 async function tratarSessaoExpiradaSISREG(tabId, mensagem) {
     if (!tabId || tabId < 0) return;
     const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
@@ -170,13 +157,10 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
 
     if (message.type === "SISREG_ESTADO") {
         const tabId = sender.tab?.id;
-        // Com all_frames=true, cada frame informa seu estado.
-        // A navegação inicial e a descoberta do menu devem ser controladas
-        // exclusivamente pelo documento principal (frameId 0).
-        if (!tabId || sender.frameId !== 0) return;
+        if (!tabId) return;
 
         const dados = await chrome.storage.session.get([
-            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado", "consultaEtapa"
+            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"
         ]);
 
         if (dados.abaSISREG !== tabId) return;
@@ -187,7 +171,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         OPERAÇÃO: CONSULTA CNS / CPF
         ---------------------------------------------
         */
-        if (dados.operacaoAtual === "consultar_cns" && dados.consultaEtapa === "cadweb") {
+        if (dados.operacaoAtual === "consultar_cns") {
             if (message.telaLogin === true) {
                 if (dados.abaNossaPagina) {
                     try {
@@ -213,7 +197,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                         await chrome.tabs.sendMessage(tabId, {
                             type: "EXECUTAR_CONSULTA_CNS",
                             numero: dados.consultaCNS?.numero
-                        }, { frameId: 0 });
+                        });
                     } catch (e) {}
                 }
                 return;
@@ -406,12 +390,11 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             consultaCNSAguardandoResultado: false
         });
         try {
-            const frameId = await localizarFrameSolicitacoes(dados.abaSISREG);
-            if (frameId === null) throw new Error("Frame da tela de Solicitações não encontrado.");
             await chrome.tabs.sendMessage(dados.abaSISREG, {
-                type: "PREENCHER_CNS_SOLICITACOES",
-                cns: dados.cnsSolicitacoesAtual
-            }, { frameId: frameId });
+                type: "RETORNAR_SOLICITACOES_CNS",
+                cns: dados.cnsSolicitacoesAtual,
+                jsonData: dados.dadosPacienteCNSAtual || {}
+            });
         } catch (erro) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -427,7 +410,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina"]);
         if (!dados.abaSISREG || !dados.abaNossaPagina) return;
         try {
-            await chrome.tabs.sendMessage(dados.abaSISREG, {type:"ABRIR_FICHA_CNS",id:String(message.id || "")}, { frameId: 0 });
+            await chrome.tabs.sendMessage(dados.abaSISREG, {type:"ABRIR_FICHA_CNS",id:String(message.id || "")});
         } catch (e) {
             try { await chrome.tabs.sendMessage(dados.abaNossaPagina,{type:"DADOS_CNS_FICHA_ERRO",mensagem:"A sessão auxiliar do SISREG não está disponível. Faça novamente a consulta."}); } catch (_) {}
         }
@@ -461,15 +444,10 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             } catch (e) {}
         }
 
-        // Mantém a etapa como "solicitacoes" enquanto a aba SISREG estiver aberta.
-        // Assim, abrir outra ficha nunca será confundido com uma nova consulta CADWEB (nu_cns).
-        await chrome.storage.session.set({
-            operacaoAtual: null,
-            consultaEtapa: "solicitacoes"
-        });
+        await chrome.storage.session.set({ operacaoAtual: null });
         await chrome.storage.session.remove([
             "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
-            "consultaCNSAguardandoResultado", "consultaCNSConsultas"
+            "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
         ]);
 
         // A aba do SISREG permanece aberta em segundo plano para abrir as fichas selecionadas.
@@ -477,22 +455,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
     }
 
     if (message.type === "DADOS_CNS_SUCESSO" || message.type === "CONSULTA_CNS_ERRO") {
-        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG", "consultaEtapa"]);
-
-        // Um erro da rotina CADWEB não pode encerrar a aba SISREG depois que a consulta
-        // inicial já terminou e a aplicação está trabalhando na tabela de Solicitações.
-        if (message.type === "CONSULTA_CNS_ERRO" && dados.consultaEtapa === "solicitacoes") {
-            if (dados.abaNossaPagina) {
-                try {
-                    await chrome.tabs.sendMessage(dados.abaNossaPagina, {
-                        type: "DADOS_CNS_FICHA_ERRO",
-                        mensagem: message.mensagem || "Não foi possível concluir esta ação na tela de Solicitações."
-                    });
-                } catch (e) {}
-            }
-            return;
-        }
-
+        const dados = await chrome.storage.session.get(["abaNossaPagina", "abaSISREG"]);
         if (dados.abaNossaPagina) {
             try {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -641,21 +604,23 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
 
         if (dados.consultaEtapa === "solicitacoes") {
             try {
-                const frameId = await localizarFrameSolicitacoes(tabId);
-                if (frameId === null) throw new Error("Frame da tela de Solicitações não encontrado após a navegação.");
                 await chrome.tabs.sendMessage(tabId, {
                     type: "PREENCHER_CNS_SOLICITACOES",
                     cns: dados.consultaCNSNumeroEncontrado
-                }, { frameId: frameId });
+                });
             } catch (e) {
                 console.error("Não foi possível retomar o preenchimento do CNS em Solicitações:", e);
             }
-        } else if (dados.consultaEtapa === "cadweb") {
-            // A navegação para CONSULTA AMB > CNS foi iniciada pelo próprio
-            // content.js, que continua aguardando o campo nu_cns e fará a pesquisa.
-            // Não reenviar EXECUTAR_CONSULTA_CNS aqui: isso pode iniciar uma segunda
-            // execução quando o SISREG já estiver exibindo o resultado do paciente.
-            console.log("Navegação inicial do CADWEB concluída; mantendo a execução atual da consulta.");
+        } else {
+            await chrome.storage.session.set({ consultaCNSIniciada: true });
+            try {
+                await chrome.tabs.sendMessage(tabId, {
+                    type: "EXECUTAR_CONSULTA_CNS",
+                    numero: dados.consultaCNS?.numero
+                });
+            } catch (e) {
+                console.error("Não foi possível retomar a consulta inicial do CNS:", e);
+            }
         }
         return;
     }
