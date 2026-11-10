@@ -361,6 +361,8 @@
         .app-brand h1{color:#fff;font-size:clamp(25px,3vw,32px)}.app-brand p{margin:7px 0 0;color:#d3e5df;font-size:14px}
         .status-header{display:inline-flex;align-items:center;gap:9px;flex:0 0 auto;margin:0;padding:10px 14px;border:1px solid rgba(255,255,255,.2)!important;border-radius:999px;background:rgba(255,255,255,.12)!important;color:#edfff5!important;font-size:13px;white-space:nowrap}
         .status-header .status-dot{background:#69e39a;box-shadow:0 0 0 4px rgba(105,227,154,.14)}
+        .status-header.sessao-expirada{background:rgba(145,28,28,.28)!important;border-color:rgba(255,210,210,.45)!important;color:#fff!important}
+        .status-header.sessao-expirada .status-dot{background:#ff7770;box-shadow:0 0 0 4px rgba(255,119,112,.18)}
         .painel-conteudo{display:grid;gap:18px;padding:26px}
         .exportacao{min-width:0;padding:24px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 3px 12px rgba(24,57,48,.035)}
         .titulo-painel{display:flex;align-items:center;gap:10px;margin:0 0 20px;color:var(--brand-900);font-size:18px;font-weight:750;letter-spacing:-.25px}
@@ -553,13 +555,13 @@ button:disabled{
 }
 
     .ficha-sisreg-original{width:100%;overflow-x:auto;background:#fff;padding:8px}.ficha-sisreg-original table{max-width:100%;border-collapse:collapse}.ficha-sisreg-original img{max-width:100%;height:auto}
-.titulo-ficha-sisreg{margin:0 0 14px;text-align:center;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;letter-spacing:.2px}
+.titulo-consulta-ambulatorial{margin:0 0 14px;text-align:center;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;letter-spacing:.2px}
 .ficha-sisreg-original{color:#111;font-family:Arial,Helvetica,sans-serif}
 .ficha-sisreg-original #fichaAmbulatorial{width:100%;margin:0 auto}
 .ficha-sisreg-original table.table_listagem{margin:0 auto}
 
 @media print{
- .titulo-ficha-sisreg{margin:0 0 8px;font-size:15px}
+ .cabecalho-solicitacao,.titulo-consulta-ambulatorial,.elementos-ocultar-impressao{display:none!important}
  .ficha-sisreg-original .somente_impressao{display:block!important}
  .ficha-sisreg-original .somente_tela{display:none!important}
  .ficha-sisreg-original{padding:0!important;overflow:visible!important}
@@ -693,9 +695,9 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
                         <button type="button" id="btnVoltarConsultasCNS" class="btn-voltar-ficha-cns">← VOLTAR ÀS SOLICITAÇÕES</button>
                         <button type="button" id="btnImprimirFichaCNS" class="btn-imprimir-ficha-cns">🖨 IMPRIMIR FICHA</button>
                     </div>
-                    <span id="identificadorFichaCNS" class="identificador-ficha-cns"></span>
+                    <span id="identificadorFichaCNS" class="identificador-ficha-cns cabecalho-solicitacao elementos-ocultar-impressao"></span>
                 </div>
-                <h3 class="titulo-ficha-cns">FICHA DA SOLICITAÇÃO</h3>
+                <h3 class="titulo-ficha-cns elementos-ocultar-impressao">FICHA DA SOLICITAÇÃO</h3>
                 <div id="conteudoFichaCNS" class="conteudo-ficha-cns"></div>
             </section>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
@@ -1302,7 +1304,7 @@ function exibirFichaCNS(html, id) {
     });
 
     const titulo = document.createElement("h2");
-    titulo.className = "titulo-ficha-sisreg";
+    titulo.className = "titulo-consulta-ambulatorial";
     titulo.textContent = "CONSULTA DE SOLICITAÇÕES AMBULATORIAIS";
 
     const moldura = document.createElement("div");
@@ -1324,6 +1326,19 @@ window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
     if (event.data.type === "DADOS_CNS_FICHA") exibirFichaCNS(event.data.html, event.data.id);
     if (event.data.type === "DADOS_CNS_FICHA_ERRO") conteudoFichaCNS.textContent = event.data.mensagem || "Não foi possível abrir a ficha.";
+    if (event.data.type === "SISREG_SESSAO_EXPIRADA") {
+        const statusPainel = document.getElementById("statusPainel");
+        const mensagem = event.data.mensagem || "A sessão do SISREG foi encerrada. Entre novamente.";
+        if (statusPainel) {
+            statusPainel.classList.add("sessao-expirada");
+            statusPainel.innerHTML = '<span class="status-dot" aria-hidden="true"></span> SISREG desconectado';
+            statusPainel.title = mensagem;
+        }
+        sessionStorage.setItem("sisreg_motivo_sessao", mensagem);
+        setTimeout(function () {
+            window.location.replace("login.html?motivo=sessao");
+        }, 900);
+    }
 });
 
 btnConsultarCNS.addEventListener("click", function () {
