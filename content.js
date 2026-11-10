@@ -85,6 +85,10 @@ chrome.runtime.onMessage.addListener(function (message) {
         window.postMessage({ type: "DADOS_CNS_FICHA_ERRO", mensagem: message.mensagem || "" }, "*");
         return;
     }
+    if (message.type === "SISREG_SESSAO_EXPIRADA") {
+        window.postMessage({ type: "SISREG_SESSAO_EXPIRADA", mensagem: message.mensagem || "A sessão do SISREG foi encerrada. Entre novamente." }, "*");
+        return;
+    }
 
     if (message.type === "CONSULTA_CNS_ERRO") {
         window.postMessage({
@@ -131,6 +135,66 @@ PARTE 3: CÓDIGO EXCLUSIVO DO SISREG (sisregiii.saude.gov.br)
 */
 if (location.hostname === "sisregiii.saude.gov.br") {
     console.log("EXTENSÃO EXECUTANDO DENTRO DO SISREG.");
+
+    let sessaoEncerradaJaNotificada = false;
+
+    function textoIndicaSessaoEncerrada(texto) {
+        const normalizado = String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        return normalizado.includes("este operador efetuou logon em outra estacao de trabalho") ||
+            normalizado.includes("sua sessao foi finalizada pelo servidor") ||
+            normalizado.includes("sessao expirada") ||
+            normalizado.includes("sessao foi finalizada") ||
+            normalizado.includes("usuario nao autenticado") ||
+            (normalizado.includes("erro de sistema") && normalizado.includes("outra estacao de trabalho"));
+    }
+
+    function notificarSessaoSISREGEncerrada(mensagem) {
+        if (sessaoEncerradaJaNotificada) return;
+        sessaoEncerradaJaNotificada = true;
+        chrome.runtime.sendMessage({
+            type: "SISREG_SESSAO_EXPIRADA",
+            mensagem: mensagem || "O SISREG encerrou sua sessão. Entre novamente."
+        });
+    }
+
+    async function verificarRespostaSISREG(resposta) {
+        if (!resposta) return false;
+        if ([401, 403, 419, 440].includes(resposta.status)) {
+            notificarSessaoSISREGEncerrada("O SISREG recusou a requisição (HTTP " + resposta.status + "). Entre novamente.");
+            return true;
+        }
+        try {
+            const texto = await resposta.clone().text();
+            if (textoIndicaSessaoEncerrada(texto)) {
+                notificarSessaoSISREGEncerrada("O SISREG encerrou sua sessão porque houve um novo acesso em outra estação. Entre novamente.");
+                return true;
+            }
+            if (resposta.redirected && /\/cgi-bin\/index(?:$|[?#])/i.test(resposta.url) &&
+                /name=["']usuario["']|id=["']usuario["']/i.test(texto)) {
+                notificarSessaoSISREGEncerrada("Sua sessão do SISREG não está mais autenticada. Entre novamente.");
+                return true;
+            }
+        } catch (erro) {}
+        return false;
+    }
+
+    function verificarDocumentoPorSessaoEncerrada() {
+        if (sessaoEncerradaJaNotificada) return;
+        const documentoErro = percorrerDocumentos(function (doc) {
+            const texto = doc.body ? (doc.body.innerText || doc.body.textContent || "") : "";
+            return textoIndicaSessaoEncerrada(texto) ? doc : null;
+        });
+        if (documentoErro) {
+            notificarSessaoSISREGEncerrada("O SISREG encerrou sua sessão porque houve um novo acesso em outra estação. Entre novamente.");
+        }
+    }
+
+    setTimeout(verificarDocumentoPorSessaoEncerrada, 300);
+    setInterval(verificarDocumentoPorSessaoEncerrada, 900);
+    if (document.documentElement && window.MutationObserver) {
+        const observadorSessao = new MutationObserver(verificarDocumentoPorSessaoEncerrada);
+        observadorSessao.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    }
 
     /*
     -----------------------------------------------------
@@ -1023,6 +1087,10 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 body: dados.toString()
             });
 
+            const sessaoEncerrada = await verificarRespostaSISREG(resposta);
+            if (sessaoEncerrada) {
+                throw new Error("Sua sessão do SISREG foi encerrada. Faça login novamente.");
+            }
             if (!resposta.ok) {
                 throw new Error("O SISREG retornou erro HTTP " + resposta.status);
             }
