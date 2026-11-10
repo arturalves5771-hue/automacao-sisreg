@@ -358,11 +358,16 @@ if (location.hostname === "sisregiii.saude.gov.br") {
     }
 
     function localizarOpcaoMenuSISREG(tipo) {
-        const seletor = "a, button, input[type='button'], input[type='submit'], [onclick], [role='menuitem'], td, span";
+        const seletor = "a, button, input, [onclick], [role='menuitem'], [title], [alt], td, span";
         return percorrerDocumentos(function (doc) {
             const elementos = Array.from(doc.querySelectorAll(seletor));
             const encontrados = elementos.filter(function (elemento) {
-                const texto = normalizarTextoMenu(elemento.innerText || elemento.textContent || elemento.value || elemento.getAttribute("title"));
+                const texto = normalizarTextoMenu(
+                    (elemento.innerText || elemento.textContent || "") + " " +
+                    (elemento.value || "") + " " +
+                    (elemento.getAttribute("title") || "") + " " +
+                    (elemento.getAttribute("alt") || "")
+                );
                 if (!texto) return false;
 
                 if (tipo === "consulta_amb") {
@@ -371,7 +376,8 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
                 return texto === "SOLICITACOES" ||
                     texto === "SOLICITACOES AMBULATORIAIS" ||
-                    texto.startsWith("SOLICITACOES ");
+                    texto.startsWith("SOLICITACOES ") ||
+                    /\\bSOLICITACOES\\b/.test(texto);
             });
 
             // Prioriza o elemento com o texto mais específico/curto.
@@ -496,11 +502,10 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 jsonData: dadosResultado
             });
 
-            const menuConsulta = await aguardarOpcaoMenuSISREG("consulta_amb", 12000);
-            menuConsulta.click();
-
-            // Aguarda o submenu ser renderizado após o clique no menu superior.
-            const opcaoSolicitacoes = await aguardarOpcaoMenuSISREG("solicitacoes", 12000);
+            // A pesquisa inicial já abriu a área CONSULTA AMB (a mesma que contém CNS).
+            // Portanto, não clicamos novamente no menu superior: procuramos diretamente
+            // a opção SOLICITAÇÕES, que fica na mesma área de navegação.
+            const opcaoSolicitacoes = await aguardarOpcaoMenuSISREG("solicitacoes", 20000);
 
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
