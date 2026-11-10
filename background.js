@@ -321,6 +321,29 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         return;
     }
 
+    if (message.type === "ABRIR_FICHA_CNS") {
+        const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina"]);
+        if (!dados.abaSISREG || !dados.abaNossaPagina) return;
+        try {
+            await chrome.tabs.sendMessage(dados.abaSISREG, {type:"ABRIR_FICHA_CNS",id:String(message.id || "")});
+        } catch (e) {
+            try { await chrome.tabs.sendMessage(dados.abaNossaPagina,{type:"DADOS_CNS_FICHA_ERRO",mensagem:"A sessão auxiliar do SISREG não está disponível. Faça novamente a consulta."}); } catch (_) {}
+        }
+        return;
+    }
+    if (message.type === "FICHA_CNS_CAPTURADA" || message.type === "FICHA_CNS_ERRO") {
+        const dados = await chrome.storage.session.get(["abaNossaPagina"]);
+        if (dados.abaNossaPagina) {
+            try {
+                await chrome.tabs.sendMessage(dados.abaNossaPagina,{
+                    type:message.type === "FICHA_CNS_CAPTURADA" ? "DADOS_CNS_FICHA" : "DADOS_CNS_FICHA_ERRO",
+                    id:message.id,html:message.html || "",mensagem:message.mensagem || ""
+                });
+            } catch (e) {}
+        }
+        return;
+    }
+
     if (message.type === "CONSULTA_CNS_PREENCHIMENTO_CONCLUIDO") {
         const dados = await chrome.storage.session.get([
             "abaNossaPagina", "abaSISREG", "consultaCNSResultado", "consultaCNSConsultas"
@@ -343,9 +366,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             "consultaCNSNumeroEncontrado", "consultaCNSConsultas", "consultaEtapa"
         ]);
 
-        if (dados.abaSISREG) {
-            setTimeout(async () => { try { await chrome.tabs.remove(dados.abaSISREG); } catch (e) {} }, 900);
-        }
+        // A aba do SISREG permanece aberta em segundo plano para abrir as fichas selecionadas.
         return;
     }
 
