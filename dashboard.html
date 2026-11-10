@@ -560,16 +560,22 @@ button:disabled{
 .cabecalho-consultas-cns{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
 .titulo-consultas-cns{margin:0;color:var(--brand-900);font-size:16px;font-weight:800;letter-spacing:.45px}
 .contador-consultas-cns{padding:5px 9px;border:1px solid #d7e8de;border-radius:999px;background:#edf7f1;color:#17683c;font-size:11px;font-weight:750;white-space:nowrap}
-.tabela-consultas-wrapper{width:100%;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#fff}
-.tabela-consultas-cns{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0;font-size:12px;text-align:left}
-.tabela-consultas-cns th{position:sticky;top:0;padding:12px 11px;background:#edf5f0;color:#36584b;font-size:10px;font-weight:800;letter-spacing:.45px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid #dce9e1}
-.tabela-consultas-cns td{padding:12px 11px;color:#344a44;vertical-align:top;border-bottom:1px solid #edf1ee;line-height:1.45}
+.tabela-consultas-wrapper{width:100%;max-width:100%;overflow:hidden;border:1px solid var(--line);border-radius:11px;background:#fff}
+.tabela-consultas-cns{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:11px;text-align:left}
+.tabela-consultas-cns th{position:sticky;top:0;padding:7px 6px;background:#edf5f0;color:#36584b;font-size:10px;font-weight:800;letter-spacing:.2px;text-transform:uppercase;white-space:normal;overflow-wrap:anywhere;border-bottom:1px solid #dce9e1}
+.tabela-consultas-cns td{padding:7px 6px;color:#344a44;font-size:11px;vertical-align:top;border-bottom:1px solid #edf1ee;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.tabela-consultas-cns th:nth-child(1),.tabela-consultas-cns td:nth-child(1){width:12%}
+.tabela-consultas-cns th:nth-child(2),.tabela-consultas-cns td:nth-child(2){width:22%}
+.tabela-consultas-cns th:nth-child(3),.tabela-consultas-cns td:nth-child(3){width:17%}
+.tabela-consultas-cns th:nth-child(4),.tabela-consultas-cns td:nth-child(4){width:15%}
+.tabela-consultas-cns th:nth-child(5),.tabela-consultas-cns td:nth-child(5){width:15%}
+.tabela-consultas-cns th:nth-child(6),.tabela-consultas-cns td:nth-child(6){width:10%}
+.tabela-consultas-cns th:nth-child(7),.tabela-consultas-cns td:nth-child(7){width:9%}
 .tabela-consultas-cns tbody tr:last-child td{border-bottom:0}
 .tabela-consultas-cns tbody tr:hover{background:#f7fbf8}
-.tabela-consultas-cns .col-id{font-weight:800;color:var(--brand-900);white-space:nowrap}
-.tabela-consultas-cns .col-situacao{font-weight:750;white-space:nowrap}
-.estado-vazio-consultas{padding:22px!important;color:#7b8b84!important;text-align:center!important;font-size:12px}
-@media(max-width:700px){.painel-consultas-cns{margin-top:17px;padding-top:15px}.tabela-consultas-cns{min-width:1050px}.cabecalho-consultas-cns{align-items:flex-start}}
+.tabela-consultas-cns .col-situacao{font-weight:750}
+.estado-vazio-consultas{padding:16px!important;color:#7b8b84!important;text-align:center!important;font-size:11px}
+@media(max-width:700px){.painel-consultas-cns{margin-top:17px;padding-top:15px}.tabela-consultas-cns th,.tabela-consultas-cns td{padding:5px 4px;font-size:10px}.tabela-consultas-cns th{font-size:9px}.cabecalho-consultas-cns{align-items:flex-start}}
 /* Enquadramento exclusivo da dashboard */
 body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidden;align-items:initial}
 .container{width:min(1120px,calc(100% - 40px));margin:30px auto}
