@@ -723,14 +723,19 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         preenchimentoSolicitacoesEmAndamento = true;
 
         try {
+            const numeroCNS = String(cns || "").replace(/\D/g, "");
+            if (numeroCNS.length !== 15) {
+                throw new Error("O Cartão SUS armazenado não possui 15 dígitos.");
+            }
+
             const campoCNS = await aguardarElementoSISREG(
                 'input[name="cns_paciente"]',
                 25000,
-                "A página de Solicitações Ambulatoriais foi aberta, mas o campo input[name='cns_paciente'] não apareceu em até 25 segundos."
+                "A página de Solicitações Ambulatoriais foi aberta, mas o campo do CNS não apareceu em até 25 segundos."
             );
 
             await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_SOLICITACOES_PRONTA" });
-            preencherCampoComEventos(campoCNS, cns);
+            preencherCampoComEventos(campoCNS, numeroCNS);
 
             const documento = campoCNS.ownerDocument;
             const botaoPesquisar = localizarBotaoPesquisaSolicitacoes(campoCNS);
@@ -742,6 +747,8 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                         key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true
                     }));
                 });
+            } else {
+                throw new Error("Não encontrei o botão de pesquisa nem o formulário de Solicitações.");
             }
 
             const consultas = await aguardarResultadoConsultas(documento, 20000);
@@ -757,9 +764,11 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 type: "CONSULTA_CNS_ERRO",
                 mensagem: erro.message || "Não foi possível preencher o CNS na tela de Solicitações Ambulatoriais."
             });
+        } finally {
+            // Libera a próxima abertura de ficha/retorno à tabela.
+            preenchimentoSolicitacoesEmAndamento = false;
         }
     }
-
     function localizarMenuConsultaAmb() {
         return percorrerDocumentos(function (doc) {
             // No HTML real do SISREG, o pai é um link .sf-with-ul.
@@ -831,7 +840,8 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 throw new Error("Não consegui recuperar o Cartão SUS já consultado. Faça uma nova consulta por CNS/CPF.");
             }
 
-            // Preserva os dados do paciente e o CNS já obtidos. Não consulta o CADWEB novamente.
+            // Mantém os dados do paciente e o CNS em memória no background.
+            // A consulta inicial do CADWEB não é repetida.
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_RESULTADO_CAPTURADO",
                 cns: numeroCNS,
@@ -854,8 +864,6 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 throw new Error("O link encontrado não pertence ao submenu de CONSULTA AMB.");
             }
 
-            // Localiza o frame de destino antes do clique para confirmar que uma nova
-            // página de SOLICITAÇÕES foi carregada, sem reutilizar a tela anterior.
             const nomeFrame = linkSolicitacoes.getAttribute("target") || "f_principal";
             const janelaTopo = menuConsultaAmb.ownerDocument.defaultView.top;
             let janelaDestino = null;
@@ -865,38 +873,54 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             } catch (erro) {}
 
             if (!janelaDestino) {
-                throw new Error("Não consegui localizar o frame principal do SISREG para reabrir SOLICITAÇÕES.");
+                throw new Error("Não consegui localizar o frame principal do SISREG (" + nomeFrame + ").");
             }
 
-            const documentoAnterior = janelaDestino.document;
+            const urlSolicitacoes = new URL(
+                linkSolicitacoes.getAttribute("href"),
+                menuConsultaAmb.ownerDocument.location.href
+            ).href;
+
+            if (!/\/cgi-bin\/gerenciador_solicitacao(?:[?#]|$)/i.test(urlSolicitacoes)) {
+                throw new Error("O link do menu não aponta para a tela oficial de Solicitações Ambulatoriais.");
+            }
+
+            // Registra o evento de carregamento ANTES de navegar. Isso funciona mesmo
+            // quando o SISREG reutiliza o mesmo frame e a URL já foi visitada antes.
+            const carregamento = new Promise(function (resolve, reject) {
+                let finalizado = false;
+                const temporizador = setTimeout(function () {
+                    if (finalizado) return;
+                    finalizado = true;
+                    janelaDestino.removeEventListener("load", aoCarregar, true);
+                    reject(new Error("O SISREG não terminou de carregar novamente a tela SOLICITAÇÕES."));
+                }, 25000);
+
+                function aoCarregar() {
+                    if (finalizado) return;
+                    let urlAtual = "";
+                    try { urlAtual = janelaDestino.location.href; } catch (erro) {}
+                    if (!/\/cgi-bin\/gerenciador_solicitacao(?:[?#]|$)/i.test(urlAtual)) return;
+
+                    finalizado = true;
+                    clearTimeout(temporizador);
+                    janelaDestino.removeEventListener("load", aoCarregar, true);
+                    resolve();
+                }
+
+                janelaDestino.addEventListener("load", aoCarregar, true);
+            });
 
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
             });
 
-            linkSolicitacoes.click();
+            // Navega diretamente pelo endereço do próprio link CONSULTA AMB > SOLICITAÇÕES.
+            // Assim não depende de um clique que possa ser ignorado por uma ficha antiga/AJAX.
+            janelaDestino.location.href = urlSolicitacoes;
+            await carregamento;
 
-            const inicioNavegacao = Date.now();
-            let documentoNovo = null;
-
-            while (Date.now() - inicioNavegacao < 25000) {
-                try {
-                    const atual = janelaDestino.document;
-                    if (atual && atual !== documentoAnterior &&
-                        (atual.readyState === "interactive" || atual.readyState === "complete")) {
-                        documentoNovo = atual;
-                        break;
-                    }
-                } catch (erro) {}
-
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-
-            if (!documentoNovo) {
-                throw new Error("O SISREG não concluiu a reabertura da tela SOLICITAÇÕES. Tente voltar à tabela e abrir novamente.");
-            }
-
-            // O CNS armazenado é aplicado somente depois da nova tela carregar.
+            // A nova tela já carregou. Reaplica apenas o CNS que já estava armazenado.
             await concluirPreenchimentoSolicitacoes(numeroCNS);
         } catch (erro) {
             chrome.runtime.sendMessage({
@@ -905,7 +929,6 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             });
         }
     }
-
     async function processarResultadoInicial(documento) {
         if (resultadoCNSProcessado) return;
         resultadoCNSProcessado = true;
