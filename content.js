@@ -590,7 +590,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 cidDescricao: descricaoTitulo,
                 solicitante: porCabecalho(["Solicitante"]),
                 executante: porCabecalho(["Executante"]),
-                dataExecucao: porCabecalho(["Data Execução", "Data da Execução", "Data de Execução", "Dt Execução", "Data Realização", "Data da Realização"]) || porCabecalhoDataExecucao(),
+                dataExecucao: porCabecalho(["Data Execução", "Data da Execução", "Data de Execução", "Dt Execução", "Data Realização", "Data da Realização"]) || porCabecalhoDataExecucao() || (celulas.length > 11 ? textos[11] : ""),
                 situacao: porCabecalho(["Situação", "Situacao"])
             });
         });
