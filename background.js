@@ -160,7 +160,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         if (!tabId) return;
 
         const dados = await chrome.storage.session.get([
-            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"
+            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado", "consultaEtapa"
         ]);
 
         if (dados.abaSISREG !== tabId) return;
@@ -171,7 +171,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         OPERAÇÃO: CONSULTA CNS / CPF
         ---------------------------------------------
         */
-        if (dados.operacaoAtual === "consultar_cns") {
+        if (dados.operacaoAtual === "consultar_cns" && dados.consultaEtapa !== "solicitacoes") {
             if (message.telaLogin === true) {
                 if (dados.abaNossaPagina) {
                     try {
