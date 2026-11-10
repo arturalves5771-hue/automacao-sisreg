@@ -514,9 +514,20 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             const tabela = linha.closest("table");
             let cabecalhos = [];
             if (tabela) {
+                const linhasTabela = Array.from(tabela.querySelectorAll("tr"));
                 const linhaCabecalho = tabela.querySelector("thead tr") ||
-                    Array.from(tabela.querySelectorAll("tr")).find(function (tr) {
+                    linhasTabela.find(function (tr) {
                         return tr.querySelector("th");
+                    }) ||
+                    linhasTabela.find(function (tr) {
+                        const textoCabecalho = normalizarCabecalhoSolicitacao(
+                            Array.from(tr.querySelectorAll("td")).map(function (td) {
+                                return td.innerText || td.textContent || "";
+                            }).join(" ")
+                        );
+                        return textoCabecalho.includes("DATASOLICITACAO") ||
+                            textoCabecalho.includes("PROCEDIMENTO") ||
+                            textoCabecalho.includes("MUNICIPIO");
                     });
                 if (linhaCabecalho) {
                     cabecalhos = Array.from(linhaCabecalho.querySelectorAll("th,td")).map(function (celula) {
