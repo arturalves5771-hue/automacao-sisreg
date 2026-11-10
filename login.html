@@ -654,6 +654,12 @@ document.addEventListener("DOMContentLoaded",function(){
  const usuarioSalvo=localStorage.getItem("sisreg_usuario_lembrado");
  if(usuarioSalvo){usuario.value=usuarioSalvo;document.getElementById("lembrarAcesso").checked=true;senha.focus();}
  else usuario.focus();
+ const motivoSessao=sessionStorage.getItem("sisreg_motivo_sessao");
+ if(motivoSessao){
+  status.textContent="⚠ "+motivoSessao+" Faça login novamente para continuar.";
+  status.className="status login-status erro";
+  sessionStorage.removeItem("sisreg_motivo_sessao");
+ }
 });
 usuario.addEventListener("keydown",function(event){if(event.key==="Enter"){event.preventDefault();senha.focus();}});
 
