@@ -826,47 +826,82 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
     async function abrirSolicitacoesEPreencher(cns, dadosResultado) {
         try {
-            // Guarda o resultado e prepara o background para eventual navegação/reload.
+            const numeroCNS = String(cns || "").replace(/\D/g, "");
+            if (numeroCNS.length !== 15) {
+                throw new Error("Não consegui recuperar o Cartão SUS já consultado. Faça uma nova consulta por CNS/CPF.");
+            }
+
+            // Preserva os dados do paciente e o CNS já obtidos. Não consulta o CADWEB novamente.
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_RESULTADO_CAPTURADO",
-                cns: cns,
-                jsonData: dadosResultado
+                cns: numeroCNS,
+                jsonData: dadosResultado || {}
             });
 
-            // ETAPA 2: localizar e abrir CONSULTA AMB, da mesma forma que o menu CNS.
             const menuConsultaAmb = localizarMenuConsultaAmb();
             if (!menuConsultaAmb) {
-                throw new Error('Não localizei o link pai CONSULTA AMB (a.sf-with-ul).');
+                throw new Error("Não localizei o menu CONSULTA AMB no SISREG.");
             }
 
             const itemMenu = abrirMenuConsultaAmb(menuConsultaAmb);
-
-            // Aguarda o submenu Superfish ficar disponível no documento do menu.
             const linkSolicitacoes = await aguardarLinkSolicitacoes(
                 menuConsultaAmb.ownerDocument,
                 5000
             );
 
-            await chrome.runtime.sendMessage({
-                type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
-            });
-
-            // Confirma que o link pertence ao submenu do item CONSULTA AMB.
             const submenu = itemMenu.querySelector("ul.sf-menu");
             if (submenu && !submenu.contains(linkSolicitacoes)) {
                 throw new Error("O link encontrado não pertence ao submenu de CONSULTA AMB.");
             }
 
-            // O próprio HTML define target="f_principal". O click preserva esse destino.
+            // Localiza o frame de destino antes do clique para confirmar que uma nova
+            // página de SOLICITAÇÕES foi carregada, sem reutilizar a tela anterior.
+            const nomeFrame = linkSolicitacoes.getAttribute("target") || "f_principal";
+            const janelaTopo = menuConsultaAmb.ownerDocument.defaultView.top;
+            let janelaDestino = null;
+
+            try {
+                janelaDestino = janelaTopo.frames[nomeFrame];
+            } catch (erro) {}
+
+            if (!janelaDestino) {
+                throw new Error("Não consegui localizar o frame principal do SISREG para reabrir SOLICITAÇÕES.");
+            }
+
+            const documentoAnterior = janelaDestino.document;
+
+            await chrome.runtime.sendMessage({
+                type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
+            });
+
             linkSolicitacoes.click();
 
-            // Se a navegação for interna/AJAX, o campo será encontrado neste mesmo documento.
-            // Se houver recarregamento completo, background.js retomará o preenchimento.
-            await concluirPreenchimentoSolicitacoes(cns);
+            const inicioNavegacao = Date.now();
+            let documentoNovo = null;
+
+            while (Date.now() - inicioNavegacao < 25000) {
+                try {
+                    const atual = janelaDestino.document;
+                    if (atual && atual !== documentoAnterior &&
+                        (atual.readyState === "interactive" || atual.readyState === "complete")) {
+                        documentoNovo = atual;
+                        break;
+                    }
+                } catch (erro) {}
+
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            if (!documentoNovo) {
+                throw new Error("O SISREG não concluiu a reabertura da tela SOLICITAÇÕES. Tente voltar à tabela e abrir novamente.");
+            }
+
+            // O CNS armazenado é aplicado somente depois da nova tela carregar.
+            await concluirPreenchimentoSolicitacoes(numeroCNS);
         } catch (erro) {
             chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_ERRO",
-                mensagem: erro.message || "Não foi possível abrir CONSULTA AMB > SOLICITAÇÕES."
+                mensagem: erro.message || "Não foi possível reabrir CONSULTA AMB > SOLICITAÇÕES."
             });
         }
     }
