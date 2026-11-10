@@ -427,7 +427,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina"]);
         if (!dados.abaSISREG || !dados.abaNossaPagina) return;
         try {
-            await chrome.tabs.sendMessage(dados.abaSISREG, {type:"ABRIR_FICHA_CNS",id:String(message.id || "")});
+            await chrome.tabs.sendMessage(dados.abaSISREG, {type:"ABRIR_FICHA_CNS",id:String(message.id || "")}, { frameId: 0 });
         } catch (e) {
             try { await chrome.tabs.sendMessage(dados.abaNossaPagina,{type:"DADOS_CNS_FICHA_ERRO",mensagem:"A sessão auxiliar do SISREG não está disponível. Faça novamente a consulta."}); } catch (_) {}
         }
