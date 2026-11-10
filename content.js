@@ -951,27 +951,55 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         try {
             let campo = buscarElementoSISREG('input[name="nu_cns"]');
 
-            // Primeira etapa: abrir a opção CNS para pesquisar o CPF ou CNS informado.
+            // A tela de CNS só é disponibilizada depois de abrir CONSULTA AMB.
+            // Não procurar/clicar em qualquer ocorrência de "CNS" espalhada no SISREG.
             if (!campo) {
-                const opcaoCNS = percorrerDocumentos(function (doc) {
-                    const opcoes = Array.from(doc.querySelectorAll("a, button, input[type='button'], input[type='submit']"));
-                    return opcoes.find(function (elemento) {
-                        const texto = (elemento.innerText || elemento.value || elemento.getAttribute("title") || "").trim();
-                        const alvo = (elemento.getAttribute("href") || "") + " " + (elemento.getAttribute("onclick") || "");
-                        return /\bCNS\b/i.test(texto) || /cns/i.test(alvo);
-                    });
-                });
+                const menuConsultaAmb = localizarMenuConsultaAmb();
+                if (!menuConsultaAmb) {
+                    throw new Error("Não localizei o menu CONSULTA AMB antes de abrir a pesquisa CNS.");
+                }
+
+                const itemMenu = abrirMenuConsultaAmb(menuConsultaAmb);
+                const inicioMenu = Date.now();
+                let opcaoCNS = null;
+
+                while (!opcaoCNS && Date.now() - inicioMenu < 10000) {
+                    const candidatos = Array.from(itemMenu.querySelectorAll(
+                        "ul a, ul button, ul [onclick], ul [role='menuitem'], a, button, [onclick]"
+                    ));
+                    opcaoCNS = candidatos.find(function (elemento) {
+                        if (elemento === menuConsultaAmb) return false;
+                        const texto = normalizarTextoMenu(
+                            (elemento.innerText || elemento.textContent || "") + " " +
+                            (elemento.value || "") + " " +
+                            (elemento.getAttribute("title") || "")
+                        );
+                        const destino = normalizarTextoMenu(
+                            (elemento.getAttribute("href") || "") + " " +
+                            (elemento.getAttribute("onclick") || "")
+                        );
+                        return texto === "CNS" ||
+                            texto === "CONSULTA CNS" ||
+                            texto.startsWith("CNS ") ||
+                            /(?:^|[^A-Z])CNS(?:[^A-Z]|$)/.test(destino);
+                    }) || null;
+
+                    if (!opcaoCNS) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
+                }
 
                 if (!opcaoCNS) {
-                    throw new Error("Não localizei a opção CNS no menu do SISREG, nem na página principal nem nos frames.");
+                    throw new Error("Abri CONSULTA AMB, mas não encontrei a opção CNS dentro desse menu.");
                 }
 
                 await chrome.runtime.sendMessage({ type: "CONSULTA_CNS_NAVEGACAO_INICIADA" });
                 opcaoCNS.click();
+
                 campo = await aguardarElementoSISREG(
                     'input[name="nu_cns"]',
                     20000,
-                    "Não encontrei input[name='nu_cns'] após abrir a opção CNS."
+                    "Abri CONSULTA AMB > CNS, mas o campo input[name='nu_cns'] não apareceu. Verifique se a opção CNS abriu no frame correto."
                 );
             }
 
