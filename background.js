@@ -337,8 +337,11 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             }
             return;
         }
+        // O retorno é executado diretamente pelo content.js.
+        // Não reativar "consultar_cns": o listener onUpdated poderia iniciar
+        // novamente a pesquisa inicial (nu_cns) ao navegar entre as fichas.
         await chrome.storage.session.set({
-            operacaoAtual: "consultar_cns",
+            operacaoAtual: null,
             consultaEtapa: "solicitacoes",
             consultaCNSNumeroEncontrado: dados.cnsSolicitacoesAtual,
             consultaCNSAguardandoNavegacao: false,
