@@ -580,7 +580,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 cidDescricao: descricaoTitulo,
                 solicitante: porCabecalho(["Solicitante"]),
                 executante: porCabecalho(["Executante"]),
-                dataAgendamento: porCabecalho(["Data Agendamento", "Data do Agendamento"]),
+                dataExecucao: porCabecalho(["Data Execução", "Data da Execução", "Data de Execução", "Data Realização", "Data da Realização"]),
                 situacao: porCabecalho(["Situação", "Situacao"])
             });
         });
