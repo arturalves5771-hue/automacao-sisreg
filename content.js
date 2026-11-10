@@ -493,6 +493,73 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
     }
 
+    function localizarMenuConsultaAmb() {
+        return percorrerDocumentos(function (doc) {
+            const elementos = Array.from(doc.querySelectorAll(
+                "a, button, [onclick], [role='menuitem'], li, span"
+            ));
+
+            const encontrados = elementos.filter(function (elemento) {
+                const texto = normalizarTextoMenu(
+                    (elemento.innerText || elemento.textContent || "") + " " +
+                    (elemento.getAttribute("title") || "")
+                );
+                return texto === "CONSULTA AMB";
+            });
+
+            encontrados.sort(function (a, b) {
+                return (a.innerText || a.textContent || "").trim().length -
+                    (b.innerText || b.textContent || "").trim().length;
+            });
+
+            return encontrados[0] || null;
+        });
+    }
+
+    function forcarSubmenuConsultaAmb(menuPai) {
+        const eventos = ["mouseover", "mouseenter"];
+        const alvos = [menuPai];
+
+        // Superfish normalmente associa o hover ao link ou ao LI pai.
+        if (menuPai.parentElement) alvos.push(menuPai.parentElement);
+        const itemLista = menuPai.closest("li");
+        if (itemLista && !alvos.includes(itemLista)) alvos.push(itemLista);
+
+        alvos.forEach(function (alvo) {
+            eventos.forEach(function (tipo) {
+                alvo.dispatchEvent(new MouseEvent(tipo, {
+                    view: alvo.ownerDocument.defaultView,
+                    bubbles: tipo === "mouseover",
+                    cancelable: true,
+                    relatedTarget: null
+                }));
+            });
+        });
+    }
+
+    function aguardarLinkSolicitacoes(documento, tempoMaximo) {
+        return new Promise(function (resolve, reject) {
+            const inicio = Date.now();
+            const seletor = 'a[href="/cgi-bin/gerenciador_solicitacao"]';
+
+            const timer = setInterval(function () {
+                const link = documento.querySelector(seletor);
+                if (link) {
+                    clearInterval(timer);
+                    resolve(link);
+                    return;
+                }
+
+                if (Date.now() - inicio >= tempoMaximo) {
+                    clearInterval(timer);
+                    reject(new Error(
+                        'O submenu foi acionado, mas não encontrei o link a[href="/cgi-bin/gerenciador_solicitacao"] no mesmo frame do menu CONSULTA AMB.'
+                    ));
+                }
+            }, 150);
+        });
+    }
+
     async function abrirSolicitacoesEPreencher(cns, dadosResultado) {
         try {
             // Guarda o resultado e prepara o background para eventual navegação/reload.
@@ -502,16 +569,26 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 jsonData: dadosResultado
             });
 
-            // A pesquisa inicial já abriu a área CONSULTA AMB (a mesma que contém CNS).
-            // Portanto, não clicamos novamente no menu superior: procuramos diretamente
-            // a opção SOLICITAÇÕES, que fica na mesma área de navegação.
-            const opcaoSolicitacoes = await aguardarOpcaoMenuSISREG("solicitacoes", 20000);
+            // Localiza CONSULTA AMB e força a abertura do submenu Superfish por hover.
+            const menuConsultaAmb = localizarMenuConsultaAmb();
+            if (!menuConsultaAmb) {
+                throw new Error('Não localizei o elemento pai "CONSULTA AMB" no SISREG.');
+            }
+
+            forcarSubmenuConsultaAmb(menuConsultaAmb);
+
+            // O link é procurado no mesmo documento/frame do elemento pai.
+            // O click mantém o contexto de navegação definido pelo próprio link/SISREG.
+            const linkSolicitacoes = await aguardarLinkSolicitacoes(
+                menuConsultaAmb.ownerDocument,
+                10000
+            );
 
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
             });
 
-            opcaoSolicitacoes.click();
+            linkSolicitacoes.click();
 
             // Se a navegação for interna/AJAX, o campo será encontrado neste mesmo documento.
             // Se houver recarregamento completo, background.js retomará o preenchimento.
