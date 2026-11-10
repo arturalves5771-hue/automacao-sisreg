@@ -170,7 +170,10 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
 
     if (message.type === "SISREG_ESTADO") {
         const tabId = sender.tab?.id;
-        if (!tabId) return;
+        // Com all_frames=true, cada frame informa seu estado.
+        // A navegação inicial e a descoberta do menu devem ser controladas
+        // exclusivamente pelo documento principal (frameId 0).
+        if (!tabId || sender.frameId !== 0) return;
 
         const dados = await chrome.storage.session.get([
             "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado", "consultaEtapa"
@@ -210,7 +213,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                         await chrome.tabs.sendMessage(tabId, {
                             type: "EXECUTAR_CONSULTA_CNS",
                             numero: dados.consultaCNS?.numero
-                        });
+                        }, { frameId: 0 });
                     } catch (e) {}
                 }
                 return;
