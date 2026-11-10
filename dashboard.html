@@ -585,6 +585,20 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
 .institutional-footer{margin-top:0}
 @media(max-width:700px){.container{width:calc(100% - 24px);margin:12px auto}.painel-conteudo{padding:15px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+ 
+.tabela-consultas-cns tbody tr.linha-consulta-clicavel{cursor:pointer;transition:background .15s ease}
+.tabela-consultas-cns tbody tr.linha-consulta-clicavel:hover{background:#eaf2fb}
+.tela-ficha-cns{margin-top:22px;padding:22px;background:#fff;border:1px solid #dce4ec;border-radius:14px}
+.cabecalho-ficha-cns{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.btn-voltar-ficha-cns{border:0;border-radius:8px;padding:10px 15px;background:#174f78;color:#fff;font-weight:700;cursor:pointer}
+.identificador-ficha-cns{font-size:13px;color:#536273;font-weight:700}
+.titulo-ficha-cns{margin:0 0 16px;color:#174f78;font-size:16px}
+.conteudo-ficha-cns{overflow-x:auto}
+.tabela-ficha-cns{width:100%;border-collapse:collapse;font-size:13px}
+.tabela-ficha-cns td,.tabela-ficha-cns th{padding:9px 11px;border:1px solid #dce4ec;text-align:left;vertical-align:top;white-space:pre-wrap}
+.tabela-ficha-cns tr:nth-child(even){background:#f6f8fa}
+.estado-ficha-cns{padding:18px;border-radius:8px;background:#f5f7fa;color:#536273}
+@media(max-width:700px){.tela-ficha-cns{padding:14px}.tabela-ficha-cns{font-size:12px}}
 </style>
 </head>
 <body>
@@ -642,6 +656,14 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
                     </div>
                 </section>
             </div>
+            <section id="telaFichaCNS" class="tela-ficha-cns oculto">
+                <div class="cabecalho-ficha-cns">
+                    <button type="button" id="btnVoltarConsultasCNS" class="btn-voltar-ficha-cns">← VOLTAR ÀS SOLICITAÇÕES</button>
+                    <span id="identificadorFichaCNS" class="identificador-ficha-cns"></span>
+                </div>
+                <h3 class="titulo-ficha-cns">DETALHES DA SOLICITAÇÃO</h3>
+                <div id="conteudoFichaCNS" class="conteudo-ficha-cns"></div>
+            </section>
             <pre id="resultadoConsultaCNS" class="resultado-cns oculto"></pre>
         </section>
 
@@ -710,6 +732,10 @@ const nomeMaeCNS=document.getElementById("nomeMaeCNS");
 const btnCopiarDadosCNS=document.getElementById("btnCopiarDadosCNS");
 const corpoTabelaConsultasCNS=document.getElementById("corpoTabelaConsultasCNS");
 const contadorConsultasCNS=document.getElementById("contadorConsultasCNS");
+const telaFichaCNS=document.getElementById("telaFichaCNS");
+const conteudoFichaCNS=document.getElementById("conteudoFichaCNS");
+const identificadorFichaCNS=document.getElementById("identificadorFichaCNS");
+const btnVoltarConsultasCNS=document.getElementById("btnVoltarConsultasCNS");
 let pastaSISREG=null;
 const DB_NOME="AutomacaoSISREG",DB_VERSAO=1,DB_STORE="configuracoes",DB_CHAVE_PASTA="pastaSISREG";
 document.addEventListener("DOMContentLoaded",async function(){carregarDatasPadrao();await inicializarPastaSISREG();});
@@ -1199,9 +1225,60 @@ function renderizarConsultasCNS(consultas) {
             if (indice === 6) celula.className = "col-situacao";
             linha.appendChild(celula);
         });
+        if (consulta.id) {
+            linha.classList.add("linha-consulta-clicavel");
+            linha.tabIndex = 0;
+            linha.title = "Clique para abrir os detalhes desta solicitação";
+            const abrir = function () {
+                identificadorFichaCNS.textContent = "SOLICITAÇÃO Nº " + consulta.id;
+                conteudoFichaCNS.textContent = "⏳ Abrindo a ficha no SISREG...";
+                resumoPacienteCNS.classList.add("oculto");
+                telaFichaCNS.classList.remove("oculto");
+                window.postMessage({type:"ABRIR_FICHA_CNS",id:consulta.id},"*");
+            };
+            linha.addEventListener("click", abrir);
+            linha.addEventListener("keydown", function (evento) {
+                if (evento.key === "Enter" || evento.key === " ") { evento.preventDefault(); abrir(); }
+            });
+        }
         corpoTabelaConsultasCNS.appendChild(linha);
     });
 }
+
+function exibirFichaCNS(html, id) {
+    const documento = new DOMParser().parseFromString(String(html || ""), "text/html");
+    const original = documento.querySelector("table.table_listagem");
+    conteudoFichaCNS.replaceChildren();
+    if (!original) { conteudoFichaCNS.textContent = "Não foi possível interpretar a ficha recebida."; return; }
+    const tabela = document.createElement("table");
+    tabela.className = "tabela-ficha-cns";
+    const tbody = document.createElement("tbody");
+    Array.from(original.querySelectorAll("tr")).forEach(function (trOriginal) {
+        const celulas = Array.from(trOriginal.children).filter(el => el.tagName === "TD" || el.tagName === "TH");
+        if (!celulas.length) return;
+        const tr = document.createElement("tr");
+        celulas.forEach(function (celulaOriginal) {
+            const celula = document.createElement(celulaOriginal.tagName.toLowerCase());
+            celula.textContent = (celulaOriginal.innerText || celulaOriginal.textContent || "").trim();
+            if (celulaOriginal.hasAttribute("colspan")) celula.colSpan = Number(celulaOriginal.getAttribute("colspan")) || 1;
+            if (celulaOriginal.hasAttribute("rowspan")) celula.rowSpan = Number(celulaOriginal.getAttribute("rowspan")) || 1;
+            tr.appendChild(celula);
+        });
+        tbody.appendChild(tr);
+    });
+    tabela.appendChild(tbody);
+    conteudoFichaCNS.appendChild(tabela);
+    identificadorFichaCNS.textContent = "SOLICITAÇÃO Nº " + id;
+}
+btnVoltarConsultasCNS.addEventListener("click", function () {
+    telaFichaCNS.classList.add("oculto");
+    resumoPacienteCNS.classList.remove("oculto");
+});
+window.addEventListener("message", function (event) {
+    if (event.source !== window || !event.data) return;
+    if (event.data.type === "DADOS_CNS_FICHA") exibirFichaCNS(event.data.html, event.data.id);
+    if (event.data.type === "DADOS_CNS_FICHA_ERRO") conteudoFichaCNS.textContent = event.data.mensagem || "Não foi possível abrir a ficha.";
+});
 
 btnConsultarCNS.addEventListener("click", function () {
     const numero = numeroConsultaCNS.value.replace(/\D/g, "");
