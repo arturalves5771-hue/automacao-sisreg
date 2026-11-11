@@ -1101,8 +1101,14 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         chrome.runtime.sendMessage({type:"FICHA_CNS_CAPTURADA",id:numero,html:copiaFicha.outerHTML});
     }
 
+    // Impede que o mesmo documento execute a consulta inicial duas vezes
+    // caso o background envie comandos repetidos durante a navegação.
+    let consultaCNSExecutando = false;
+
     chrome.runtime.onMessage.addListener(function (message) {
         if (message.type === "EXECUTAR_CONSULTA_CNS") {
+            if (consultaCNSExecutando) return;
+            consultaCNSExecutando = true;
             consultaCNSResultadoEnviado = false;
             executarConsultaCNS(message.numero);
             return;
