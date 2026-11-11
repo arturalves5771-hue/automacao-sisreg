@@ -1356,6 +1356,14 @@ btnConsultarCNS.addEventListener("click", function () {
 
     resultadoConsultaCNS.textContent = "";
     resultadoConsultaCNS.classList.add("oculto");
+
+    // Sempre encerra a visualização da ficha anterior ao iniciar uma nova consulta.
+    // Isso também oculta os títulos e os botões de voltar/imprimir, pois pertencem
+    // à seção telaFichaCNS.
+    telaFichaCNS.classList.add("oculto");
+    conteudoFichaCNS.replaceChildren();
+    identificadorFichaCNS.textContent = "";
+
     resumoPacienteCNS.classList.add("oculto");
     renderizarConsultasCNS([]);
     btnCopiarDadosCNS.disabled = true;
