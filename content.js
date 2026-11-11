@@ -23,7 +23,11 @@ window.addEventListener("message", function (event) {
         return;
     }
     if (event.data.type === "RETORNAR_SOLICITACOES_CNS") {
-        chrome.runtime.sendMessage({ type: "RETORNAR_SOLICITACOES_CNS" });
+        const cns = String(event.data.cns || "").replace(/\D/g, "");
+        chrome.runtime.sendMessage({
+            type: "RETORNAR_SOLICITACOES_CNS",
+            cns: cns
+        });
         return;
     }
 
