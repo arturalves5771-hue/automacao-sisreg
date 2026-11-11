@@ -366,33 +366,39 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
 
     if (message.type === "RETORNAR_SOLICITACOES_CNS") {
         const dados = await chrome.storage.session.get([
-            "abaSISREG", "abaNossaPagina", "cnsSolicitacoesAtual", "dadosPacienteCNSAtual"
+            "abaSISREG", "abaNossaPagina", "dadosPacienteCNSAtual"
         ]);
-        if (!dados.abaSISREG || !dados.cnsSolicitacoesAtual) {
+
+        // A origem obrigatória do CNS no retorno é o elemento #cartaoSUSCNS
+        // da página da aplicação, enviado pelo content.js.
+        const cnsDaPagina = String(message.cns || "").replace(/\D/g, "");
+
+        if (!dados.abaSISREG || cnsDaPagina.length !== 15) {
             if (dados.abaNossaPagina) {
                 try {
                     await chrome.tabs.sendMessage(dados.abaNossaPagina, {
                         type: "DADOS_CNS_FICHA_ERRO",
-                        mensagem: "Não consegui recuperar o CNS desta consulta. Faça uma nova pesquisa."
+                        mensagem: "Não consegui recuperar um CNS válido do cartão SUS exibido na página. Faça novamente a consulta inicial."
                     });
                 } catch (erro) {}
             }
             return;
         }
-        // O retorno é executado diretamente pelo content.js.
-        // Não reativar "consultar_cns": o listener onUpdated poderia iniciar
-        // novamente a pesquisa inicial (nu_cns) ao navegar entre as fichas.
+
+        // Não reativar "consultar_cns": o retorno não pode executar nu_cns.
         await chrome.storage.session.set({
+            cnsSolicitacoesAtual: cnsDaPagina,
             operacaoAtual: null,
             consultaEtapa: "solicitacoes",
-            consultaCNSNumeroEncontrado: dados.cnsSolicitacoesAtual,
+            consultaCNSNumeroEncontrado: cnsDaPagina,
             consultaCNSAguardandoNavegacao: false,
             consultaCNSAguardandoResultado: false
         });
+
         try {
             await chrome.tabs.sendMessage(dados.abaSISREG, {
                 type: "RETORNAR_SOLICITACOES_CNS",
-                cns: dados.cnsSolicitacoesAtual,
+                cns: cnsDaPagina,
                 jsonData: dados.dadosPacienteCNSAtual || {}
             });
         } catch (erro) {
