@@ -1317,10 +1317,21 @@ document.getElementById("btnImprimirFichaCNS").addEventListener("click", functio
     window.print();
 });
 btnVoltarConsultasCNS.addEventListener("click", function () {
+    // O CNS vem da própria página, do cartão SUS exibido ao usuário.
+    const cnsPagina = String(cartaoSUSCNS.textContent || "").replace(/\D/g, "");
+
+    if (cnsPagina.length !== 15) {
+        conteudoFichaCNS.textContent = "Não consegui localizar um CNS válido nas informações do paciente. Faça novamente a consulta inicial.";
+        return;
+    }
+
     telaFichaCNS.classList.add("oculto");
     resumoPacienteCNS.classList.remove("oculto");
     conteudoFichaCNS.textContent = "⏳ Retornando às solicitações do SISREG...";
-    window.postMessage({type:"RETORNAR_SOLICITACOES_CNS"},"*");
+    window.postMessage({
+        type: "RETORNAR_SOLICITACOES_CNS",
+        cns: cnsPagina
+    }, "*");
 });
 window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
