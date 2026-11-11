@@ -1106,6 +1106,13 @@ if (location.hostname === "sisregiii.saude.gov.br") {
     let consultaCNSExecutando = false;
 
     chrome.runtime.onMessage.addListener(function (message) {
+        if (message.type === "REINICIAR_CONSULTA_CNS") {
+            consultaCNSExecutando = false;
+            consultaCNSResultadoEnviado = false;
+            resultadoCNSProcessado = false;
+            preenchimentoSolicitacoesEmAndamento = false;
+            return;
+        }
         if (message.type === "EXECUTAR_CONSULTA_CNS") {
             if (consultaCNSExecutando) return;
             consultaCNSExecutando = true;
