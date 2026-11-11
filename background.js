@@ -1,11 +1,63 @@
+async function iniciarReautenticacaoConsultaCNS(tabId, abrirTelaLogin) {
+    const dados = await chrome.storage.session.get([
+        "abaSISREG", "loginSISREG", "consultaCNS", "operacaoAtual",
+        "reautenticacaoCNSIniciada"
+    ]);
+
+    if (dados.abaSISREG !== tabId) return false;
+    if (dados.operacaoAtual === "reautenticar_consulta_cns") return true;
+    if (dados.operacaoAtual !== "consultar_cns") return false;
+    if (!dados.loginSISREG?.username || !dados.loginSISREG?.password || !dados.consultaCNS?.numero) return false;
+
+    await chrome.storage.session.set({
+        operacaoAtual: "reautenticar_consulta_cns",
+        reautenticacaoCNSIniciada: true,
+        tentativaEnviada: false,
+        consultaCNSIniciada: false,
+        consultaCNSAguardandoNavegacao: false,
+        consultaCNSAguardandoResultado: false,
+        sessaoExpiradaNotificada: false
+    });
+
+    if (abrirTelaLogin) {
+        try {
+            await chrome.tabs.update(tabId, { url: "https://sisregiii.saude.gov.br/cgi-bin/index" });
+        } catch (erro) {
+            console.error("Não foi possível reabrir a tela de login do SISREG:", erro);
+            return false;
+        }
+    } else {
+        await chrome.storage.session.set({ tentativaEnviada: true });
+        try {
+            await chrome.tabs.sendMessage(tabId, {
+                type: "PREENCHER_LOGIN",
+                username: dados.loginSISREG.username,
+                password: dados.loginSISREG.password
+            });
+        } catch (erro) {
+            console.warn("Não foi possível preencher o login automático do SISREG:", erro);
+        }
+    }
+
+    return true;
+}
+
 async function tratarSessaoExpiradaSISREG(tabId, mensagem) {
     if (!tabId || tabId < 0) return;
-    const dados = await chrome.storage.session.get(["abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada"]);
+    const dados = await chrome.storage.session.get([
+        "abaSISREG", "abaNossaPagina", "sessaoExpiradaNotificada", "operacaoAtual"
+    ]);
     if ((dados.abaSISREG && dados.abaSISREG !== tabId) || dados.sessaoExpiradaNotificada) return;
+
+    // Durante uma consulta ativa, tenta autenticar novamente e continuar o mesmo CNS/CPF.
+    if (dados.operacaoAtual === "consultar_cns" &&
+        await iniciarReautenticacaoConsultaCNS(tabId, true)) {
+        return;
+    }
 
     await chrome.storage.session.set({ sessaoExpiradaNotificada: true, operacaoAtual: null });
     await chrome.storage.session.remove([
-        "loginSISREG", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada",
+        "tentativaEnviada", "consultaCNS", "consultaCNSIniciada",
         "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado",
         "consultaCNSConsultas", "consultaEtapa", "exportacaoCSV", "exportacaoIniciada"
     ]);
@@ -68,6 +120,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             consultaCNSNumeroEncontrado: null,
             consultaCNSConsultas: [],
             consultaEtapa: "cadweb",
+            reautenticacaoCNSIniciada: false,
             abaNossaPagina: abaNossaPagina
         });
 
@@ -173,6 +226,8 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         */
         if (dados.operacaoAtual === "consultar_cns") {
             if (message.telaLogin === true) {
+                if (await iniciarReautenticacaoConsultaCNS(tabId, false)) return;
+
                 if (dados.abaNossaPagina) {
                     try {
                         await chrome.tabs.sendMessage(dados.abaNossaPagina, {
@@ -183,9 +238,9 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 }
                 await chrome.storage.session.set({ operacaoAtual: null });
                 await chrome.storage.session.remove([
-            "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
-            "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
-        ]);
+                    "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
+                    "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
+                ]);
                 setTimeout(async () => { try { await chrome.tabs.remove(tabId); } catch (e) {} }, 500);
                 return;
             }
@@ -199,6 +254,68 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                             numero: dados.consultaCNS?.numero
                         });
                     } catch (e) {}
+                }
+                return;
+            }
+        }
+
+        /*
+        ---------------------------------------------
+        OPERAÇÃO: REAUTENTICAÇÃO AUTOMÁTICA DA CONSULTA
+        ---------------------------------------------
+        */
+        if (dados.operacaoAtual === "reautenticar_consulta_cns") {
+            if (message.erroLogin) {
+                if (dados.abaNossaPagina) {
+                    try {
+                        await chrome.tabs.sendMessage(dados.abaNossaPagina, {
+                            type: "CONSULTA_CNS_ERRO",
+                            mensagem: "A sessão expirou e o SISREG não aceitou o login automático. Verifique suas credenciais e faça login novamente."
+                        });
+                    } catch (e) {}
+                }
+                await chrome.storage.session.set({ operacaoAtual: null });
+                await chrome.storage.session.remove([
+                    "loginSISREG", "tentativaEnviada", "reautenticacaoCNSIniciada",
+                    "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao",
+                    "consultaCNSAguardandoResultado", "consultaCNSConsultas", "consultaEtapa"
+                ]);
+                return;
+            }
+
+            if (message.telaLogin === true) {
+                if (dados.tentativaEnviada) return;
+                const login = dados.loginSISREG;
+                if (!login?.username || !login?.password) return;
+
+                await chrome.storage.session.set({ tentativaEnviada: true });
+                try {
+                    await chrome.tabs.sendMessage(tabId, {
+                        type: "PREENCHER_LOGIN",
+                        username: login.username,
+                        password: login.password
+                    });
+                } catch (erro) {}
+                return;
+            }
+
+            if (message.telaLogin === false) {
+                await chrome.storage.session.set({
+                    operacaoAtual: "consultar_cns",
+                    reautenticacaoCNSIniciada: false,
+                    tentativaEnviada: false,
+                    consultaCNSIniciada: true,
+                    consultaCNSAguardandoNavegacao: false,
+                    consultaCNSAguardandoResultado: false
+                });
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: "REINICIAR_CONSULTA_CNS" });
+                    await chrome.tabs.sendMessage(tabId, {
+                        type: "EXECUTAR_CONSULTA_CNS",
+                        numero: dados.consultaCNS?.numero
+                    });
+                } catch (erro) {
+                    console.error("Não foi possível retomar a consulta após o login automático:", erro);
                 }
                 return;
             }
@@ -225,7 +342,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 }
 
                 await chrome.storage.session.set({ operacaoAtual: null });
-                await chrome.storage.session.remove(["loginSISREG", "abaSISREG", "tentativaEnviada"]);
+                await chrome.storage.session.remove(["abaSISREG", "tentativaEnviada"]);
 
                 setTimeout(async () => {
                     try { await chrome.tabs.remove(tabId); } catch (e) {}
