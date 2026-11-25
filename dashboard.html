@@ -1144,7 +1144,13 @@ btnCopiarDadosCNS.addEventListener("click", async function () {
 });
 
 function normalizarRotuloCNS(valor) {
-    return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    return String(valor || "")
+        .normalize("NFD")
+        .replace(/[\\u0300-\\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, " ")
+        .replace(/\\s+/g, " ")
+        .trim();
 }
 
 function localizarValorCNS(dados, padroes) {
