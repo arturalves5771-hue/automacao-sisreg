@@ -865,11 +865,11 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                     );
                     let caminho = "";
                     try {
-                        caminho = new URL(href, candidato.ownerDocument.location.href).pathname
-                            .replace(/\\/$/, "");
+                        caminho = new URL(href, candidato.ownerDocument.location.href).pathname;
+                        while (caminho.endsWith("/")) caminho = caminho.slice(0, -1);
                     } catch (erro) {}
 
-                    const destinoCorreto = /\\/cgi-bin\\/gerenciador_solicitacao$/i.test(caminho);
+                    const destinoCorreto = caminho.toLowerCase().endsWith("/cgi-bin/gerenciador_solicitacao");
                     const textoCorreto = /SOLICITACOES/.test(texto) && !/CONSULTA AMB/.test(texto);
                     return destinoCorreto || textoCorreto;
                 });
