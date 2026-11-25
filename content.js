@@ -910,7 +910,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
     }
 
-    async async function processarResultadoInicial(documento) {
+    async function processarResultadoInicial(documento) {
         if (resultadoCNSProcessado) return;
         resultadoCNSProcessado = true;
 
