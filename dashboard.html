@@ -1146,10 +1146,10 @@ btnCopiarDadosCNS.addEventListener("click", async function () {
 function normalizarRotuloCNS(valor) {
     return String(valor || "")
         .normalize("NFD")
-        .replace(/[\\u0300-\\u036f]/g, "")
+        .replace(/[\u0300-\u036f]/g, "")
         .toUpperCase()
         .replace(/[^A-Z0-9]+/g, " ")
-        .replace(/\\s+/g, " ")
+        .replace(/\s+/g, " ")
         .trim();
 }
 
@@ -1243,7 +1243,7 @@ function exibirResumoPacienteCNS(dados) {
         /^CARTAO NACIONAL DE SAUDE$/,
         /^NUMERO DO CARTAO SUS$/
     ]) || resumoTexto.cns;
-    const cartaoDigitos = String(cartaoBruto || "").replace(/\\D/g, "");
+    const cartaoDigitos = String(cartaoBruto || "").replace(/\D/g, "");
     const cartao = cartaoDigitos.length === 15 ? cartaoDigitos : "";
 
     const mae = localizarValorCNS(dados, [
