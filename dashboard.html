@@ -1220,10 +1220,31 @@ function exibirResumoPacienteCNS(dados) {
     const texto = dados && typeof dados.texto === "string" ? dados.texto : "";
     const resumoTexto = extrairResumoDoTextoCNS(texto);
 
-    // O texto bruto do CADWEB é a fonte principal; as tabelas/campos ficam como reserva.
-    const nome = resumoTexto.nome || localizarValorCNS(dados, [/^NOME(?: DO PACIENTE| DO USUARIO)?$/]);
-    const cartao = resumoTexto.cns || localizarValorCNS(dados, [/^CNS$/, /CARTAO NACIONAL DE SAUDE/, /^NUMERO DO CARTAO SUS$/]);
-    const mae = resumoTexto.mae || localizarValorCNS(dados, [/^NOME DA MAE$/, /^MAE$/]);
+    // Prioriza os campos e as tabelas estruturadas do CADWEB.
+    // O texto bruto permanece como alternativa para os formatos antigos da tela.
+    const nome = localizarValorCNS(dados, [
+        /^NOME$/,
+        /^NOME DO PACIENTE$/,
+        /^NOME DO USUARIO$/,
+        /^NOME COMPLETO$/
+    ]) || resumoTexto.nome;
+
+    const cartaoBruto = localizarValorCNS(dados, [
+        /^CNS$/,
+        /^NUMERO CNS$/,
+        /^CNS DO PACIENTE$/,
+        /^CARTAO SUS$/,
+        /^CARTAO NACIONAL DE SAUDE$/,
+        /^NUMERO DO CARTAO SUS$/
+    ]) || resumoTexto.cns;
+    const cartaoDigitos = String(cartaoBruto || "").replace(/\\D/g, "");
+    const cartao = cartaoDigitos.length === 15 ? cartaoDigitos : "";
+
+    const mae = localizarValorCNS(dados, [
+        /^NOME DA MAE$/,
+        /^MAE$/,
+        /^NOME MATERNO$/
+    ]) || resumoTexto.mae;
 
     nomePacienteCNS.textContent = nome || "Nome não identificado";
     cartaoSUSCNS.textContent = cartao ? "🟢 CNS: " + cartao : "🟢 Consulta realizada";
