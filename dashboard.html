@@ -1493,9 +1493,19 @@ window.addEventListener("message", function (event) {
     }
 
     if (event.data.type === "CONSULTA_CNS_ERRO") {
+        const mensagemErro = event.data.mensagem || "Não foi possível concluir a consulta.";
+
+        // Quando o SISREG informa que a sessão não está autenticada,
+        // retorna automaticamente ao login da aplicação.
+        if (/sess[aã]o do SISREG n[aã]o autenticada/i.test(mensagemErro)) {
+            sessionStorage.setItem("sisreg_motivo_sessao", mensagemErro);
+            window.location.replace("login.html?motivo=sessao");
+            return;
+        }
+
         btnConsultarCNS.disabled = false;
         btnConsultarCNS.textContent = "CONSULTAR DADOS";
-        exibirMensagemConsultaCNS("✕ " + (event.data.mensagem || "Não foi possível concluir a consulta."), "erro");
+        exibirMensagemConsultaCNS("✕ " + mensagemErro, "erro");
     }
 });
 
