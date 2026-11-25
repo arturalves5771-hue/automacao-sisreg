@@ -849,15 +849,31 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         return itemMenu;
     }
 
-    function aguardarLinkSolicitacoes(documento, tempoMaximo) {
+    function aguardarLinkSolicitacoes(itemMenu, tempoMaximo) {
         return new Promise(function (resolve, reject) {
-            const seletor = 'a[href="/cgi-bin/gerenciador_solicitacao"]';
             const inicio = Date.now();
 
             const timer = setInterval(function () {
-                // O link pode estar no DOM desde o início, mas oculto.
-                // Após o hover, clicamos no próprio link, sem simular clique no submenu.
-                const link = documento.querySelector(seletor);
+                // O SISREG pode variar o href (barra final, parâmetros ou caminho relativo).
+                // Por isso, identifica a opção pelo destino OU pelo texto do link,
+                // sempre limitada ao item de menu CONSULTA AMB.
+                const links = Array.from(itemMenu.querySelectorAll("a"));
+                const link = links.find(function (candidato) {
+                    const href = candidato.getAttribute("href") || "";
+                    const texto = normalizarTextoMenu(
+                        candidato.innerText || candidato.textContent || candidato.getAttribute("title") || ""
+                    );
+                    let caminho = "";
+                    try {
+                        caminho = new URL(href, candidato.ownerDocument.location.href).pathname;
+                        while (caminho.endsWith("/")) caminho = caminho.slice(0, -1);
+                    } catch (erro) {}
+
+                    const destinoCorreto = caminho.toLowerCase().endsWith("/cgi-bin/gerenciador_solicitacao");
+                    const textoCorreto = /SOLICITACOES/.test(texto) && !/CONSULTA AMB/.test(texto);
+                    return destinoCorreto || textoCorreto;
+                });
+
                 if (link) {
                     clearInterval(timer);
                     resolve(link);
@@ -867,7 +883,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 if (Date.now() - inicio >= tempoMaximo) {
                     clearInterval(timer);
                     reject(new Error(
-                        'Não encontrei o link de Solicitações no submenu CONSULTA AMB: ' + seletor
+                        "Não encontrei a opção SOLICITAÇÕES dentro do menu CONSULTA AMB."
                     ));
                 }
             }, 150);
@@ -894,59 +910,17 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             }
 
             const itemMenu = abrirMenuConsultaAmb(menuConsultaAmb);
-            const linkSolicitacoes = await aguardarLinkSolicitacoes(
-                menuConsultaAmb.ownerDocument,
-                5000
-            );
-
-            const submenu = itemMenu.querySelector("ul.sf-menu");
-            if (submenu && !submenu.contains(linkSolicitacoes)) {
-                throw new Error("O link encontrado não pertence ao submenu de CONSULTA AMB.");
-            }
-
-            // Localiza o frame de destino antes do clique para confirmar que uma nova
-            // página de SOLICITAÇÕES foi carregada, sem reutilizar a tela anterior.
-            const nomeFrame = linkSolicitacoes.getAttribute("target") || "f_principal";
-            const janelaTopo = menuConsultaAmb.ownerDocument.defaultView.top;
-            let janelaDestino = null;
-
-            try {
-                janelaDestino = janelaTopo.frames[nomeFrame];
-            } catch (erro) {}
-
-            if (!janelaDestino) {
-                throw new Error("Não consegui localizar o frame principal do SISREG para reabrir SOLICITAÇÕES.");
-            }
-
-            const documentoAnterior = janelaDestino.document;
+            const linkSolicitacoes = await aguardarLinkSolicitacoes(itemMenu, 7000);
 
             await chrome.runtime.sendMessage({
                 type: "CONSULTA_CNS_NAVEGACAO_SOLICITACOES_INICIADA"
             });
 
+            // Alguns ambientes do SISREG navegam criando outro documento no frame;
+            // outros atualizam o conteúdo no próprio documento. Não dependemos mais
+            // da identidade do objeto Document: aguardamos o campo real da tela-alvo.
             linkSolicitacoes.click();
 
-            const inicioNavegacao = Date.now();
-            let documentoNovo = null;
-
-            while (Date.now() - inicioNavegacao < 25000) {
-                try {
-                    const atual = janelaDestino.document;
-                    if (atual && atual !== documentoAnterior &&
-                        (atual.readyState === "interactive" || atual.readyState === "complete")) {
-                        documentoNovo = atual;
-                        break;
-                    }
-                } catch (erro) {}
-
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-
-            if (!documentoNovo) {
-                throw new Error("O SISREG não concluiu a reabertura da tela SOLICITAÇÕES. Tente voltar à tabela e abrir novamente.");
-            }
-
-            // O CNS armazenado é aplicado somente depois da nova tela carregar.
             await concluirPreenchimentoSolicitacoes(numeroCNS);
         } catch (erro) {
             chrome.runtime.sendMessage({
