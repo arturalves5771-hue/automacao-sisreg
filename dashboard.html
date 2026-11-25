@@ -1154,73 +1154,134 @@ function normalizarRotuloCNS(valor) {
 }
 
 function localizarValorCNS(dados, padroes) {
-    const procurarEmCelulas = function (linhas) {
-        for (const linha of (linhas || [])) {
-            for (let i = 0; i < linha.length; i++) {
-                const rotulo = normalizarRotuloCNS(linha[i]);
-                if (padroes.some(function (padrao) { return padrao.test(rotulo); })) {
-                    const valor = linha.slice(i + 1).find(function (item) { return String(item || "").trim(); });
+    if (!dados || typeof dados !== "object") return "";
+
+    const rotulosConhecidos = new Set([
+        "NOME", "NOME SOCIAL APELIDO", "NOME DA MAE", "NOME DO PAI",
+        "SEXO", "DATA DE NASCIMENTO", "NASCIMENTO", "CNS",
+        "CPF", "RACA COR", "NACIONALIDADE", "MUNICIPIO DE RESIDENCIA",
+        "ENDERECO", "BAIRRO", "CEP", "TELEFONE", "CELULAR",
+        "NOME DA PESSOA", "CARTAO SUS", "CARTAO NACIONAL DE SAUDE"
+    ]);
+    const correspondeRotulo = function (valor) {
+        const rotulo = normalizarRotuloCNS(valor);
+        return padroes.some(function (padrao) { return padrao.test(rotulo); });
+    };
+    const pareceRotulo = function (valor) {
+        const texto = String(valor || "").trim();
+        return /[:：]$/.test(texto) || rotulosConhecidos.has(normalizarRotuloCNS(texto));
+    };
+
+    // 1) Tabelas: procura o rótulo e aceita o valor na célula seguinte,
+    // inclusive quando o CADWEB distribui rótulo e valor em linhas diferentes.
+    for (const tabela of (Array.isArray(dados.tabelas) ? dados.tabelas : [])) {
+        const linhas = Array.isArray(tabela) ? tabela : [];
+        for (let i = 0; i < linhas.length; i++) {
+            const linha = Array.isArray(linhas[i]) ? linhas[i] : [];
+            for (let j = 0; j < linha.length; j++) {
+                if (!correspondeRotulo(linha[j])) continue;
+
+                for (let k = j + 1; k < linha.length; k++) {
+                    const valor = String(linha[k] || "").trim();
+                    if (valor && !pareceRotulo(valor)) return valor;
+                }
+
+                for (let proxima = i + 1; proxima < linhas.length; proxima++) {
+                    const celulas = Array.isArray(linhas[proxima]) ? linhas[proxima] : [];
+                    const valor = celulas.find(function (item) {
+                        const texto = String(item || "").trim();
+                        return texto && !pareceRotulo(texto);
+                    });
                     if (valor) return String(valor).trim();
                 }
+            }
+        }
+    }
+
+    // 2) Campos estruturados extraídos de inputs/selects do CADWEB.
+    for (const campo of (Array.isArray(dados.campos) ? dados.campos : [])) {
+        if (correspondeRotulo(campo.campo) && String(campo.valor || "").trim()) {
+            return String(campo.valor).trim();
+        }
+    }
+
+    // 3) Texto bruto: separa corretamente por quebras de linha reais.
+    // Também reconhece "RÓTULO: valor" e rótulo/valor em linhas consecutivas.
+    const linhasTexto = String(dados.texto || "")
+        .replace(/\r\n?/g, "\n")
+        .split(/\n+/)
+        .map(function (linha) { return linha.trim(); })
+        .filter(Boolean);
+
+    for (let i = 0; i < linhasTexto.length; i++) {
+        const linha = linhasTexto[i];
+        const separador = linha.search(/[:：]/);
+        const rotuloLinha = separador >= 0 ? linha.slice(0, separador) : linha;
+
+        if (!correspondeRotulo(rotuloLinha)) continue;
+
+        if (separador >= 0) {
+            const valorNaLinha = linha.slice(separador + 1).trim();
+            if (valorNaLinha && !correspondeRotulo(valorNaLinha)) return valorNaLinha;
+        }
+
+        if (linhasTexto[i + 1] && !pareceRotulo(linhasTexto[i + 1])) {
+            return linhasTexto[i + 1];
+        }
+    }
+
+    return "";
+}
+
+function extrairResumoDoTextoCNS(texto) {
+    const clean = String(texto || "").replace(/\r\n?/g, "\n");
+    const linhas = clean.split(/\n+/).map(function (linha) {
+        return linha.trim();
+    }).filter(Boolean);
+
+    const localizar = function (rotulos) {
+        const normalizados = rotulos.map(normalizarRotuloCNS);
+        for (let i = 0; i < linhas.length; i++) {
+            const linha = linhas[i];
+            const posicao = linha.search(/[:：]/);
+            const rotulo = posicao >= 0 ? linha.slice(0, posicao) : linha;
+            if (!normalizados.includes(normalizarRotuloCNS(rotulo))) continue;
+
+            const valorInline = posicao >= 0 ? linha.slice(posicao + 1).trim() : "";
+            if (valorInline) return valorInline;
+            if (linhas[i + 1] && !normalizados.includes(normalizarRotuloCNS(linhas[i + 1]))) {
+                return linhas[i + 1];
             }
         }
         return "";
     };
 
-    for (const tabela of (dados.tabelas || [])) {
-        const valor = procurarEmCelulas(tabela);
-        if (valor) return valor;
-    }
-
-    for (const campo of (dados.campos || [])) {
-        const rotulo = normalizarRotuloCNS(campo.campo);
-        if (padroes.some(function (padrao) { return padrao.test(rotulo); }) && String(campo.valor || "").trim()) {
-            return String(campo.valor).trim();
-        }
-    }
-
-    const linhasTexto = String(dados.texto || "").split(/\\r?\\n/).map(function (linha) { return linha.trim(); }).filter(Boolean);
-    for (let i = 0; i < linhasTexto.length; i++) {
-        const rotulo = normalizarRotuloCNS(linhasTexto[i]);
-        if (padroes.some(function (padrao) { return padrao.test(rotulo); })) {
-            const mesmaLinha = linhasTexto[i].split(/[:：]/).slice(1).join(":").trim();
-            if (mesmaLinha) return mesmaLinha;
-            if (linhasTexto[i + 1]) return linhasTexto[i + 1].trim();
-        }
-    }
-    return "";
-}
-
-function extrairResumoDoTextoCNS(texto) {
-    const clean = String(texto || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
-    // Replica a lógica que já funcionava no conversor CADWEB enviado.
+    // Compatibilidade com o formato antigo do CADWEB, no qual alguns campos
+    // aparecem agrupados na mesma linha/trecho de texto.
     let nome = "";
     const nomeBlock = clean.match(/Nome:\s*Nome Social \/ Apelido:\s*([\s\S]*?)(?=Nome da Mãe:)/i);
     if (nomeBlock) {
-        const valor = nomeBlock[1].trim().replace(/\n/g, " ");
-        nome = valor.includes("---") ? valor.split("---")[0].trim() : valor;
+        nome = nomeBlock[1].trim().replace(/\n/g, " ").split("---")[0].trim();
+    } else {
+        nome = localizar(["Nome", "Nome do Paciente", "Nome do Usuário", "Nome Completo"]);
     }
 
     let mae = "";
-    const paisBlock = clean.match(/Nome da Mãe:\s*Nome do Pai:\s*([\s\S]*?)(?=Sexo:)/i);
-    if (paisBlock) {
-        const valor = paisBlock[1].trim().replace(/\n/g, " ");
+    const maeBlock = clean.match(/Nome da Mãe:\s*Nome do Pai:\s*([\s\S]*?)(?=Sexo:)/i);
+    if (maeBlock) {
+        const valor = maeBlock[1].trim().replace(/\n/g, " ");
         const palavras = valor.split(/\s+/).filter(Boolean);
-        if (palavras.length >= 4) {
-            const meio = Math.floor(palavras.length / 2);
-            mae = palavras.slice(0, meio).join(" ");
-        } else {
-            mae = valor;
-        }
+        mae = palavras.length >= 4
+            ? palavras.slice(0, Math.floor(palavras.length / 2)).join(" ")
+            : valor;
+    } else {
+        mae = localizar(["Nome da Mãe", "Mãe", "Nome Materno"]);
     }
 
-    const cnsMatch = clean.match(/CNS:\s*(\d{15})/i);
-    return {
-        nome: nome,
-        mae: mae,
-        cns: cnsMatch ? cnsMatch[1] : ""
-    };
+    const cns = localizar(["CNS", "Número CNS", "Cartão SUS", "Cartão Nacional de Saúde"]) ||
+        ((clean.match(/CNS:\s*([\d.\s-]{15,})/i) || [])[1] || "").replace(/\D/g, "");
+
+    return { nome: nome, mae: mae, cns: String(cns || "").replace(/\D/g, "") };
 }
 function exibirResumoPacienteCNS(dados) {
     const texto = dados && typeof dados.texto === "string" ? dados.texto : "";
