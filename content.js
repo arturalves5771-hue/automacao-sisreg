@@ -402,20 +402,67 @@ if (location.hostname === "sisregiii.saude.gov.br") {
     function extrairNumeroCNS(dados, numeroOriginal) {
         const original = String(numeroOriginal || "").replace(/\D/g, "");
         if (original.length === 15) return original;
+        if (!dados || typeof dados !== "object") return "";
 
-        // Primeiro tenta localizar o CNS nos campos estruturados do CADWEB.
-        if (dados && Array.isArray(dados.campos)) {
-            for (const item of dados.campos) {
-                const rotulo = String(item.campo || "");
-                const valor = String(item.valor || "").replace(/\D/g, "");
-                if (/(CNS|CART[AÃ]O.*SUS|CART[AÃ]O NACIONAL)/i.test(rotulo) && valor.length === 15) {
-                    return valor;
+        const normalizarRotulo = function (valor) {
+            return String(valor || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toUpperCase()
+                .replace(/[^A-Z0-9]+/g, " ")
+                .trim();
+        };
+        const ehRotuloCNS = function (valor) {
+            const rotulo = normalizarRotulo(valor);
+            return /^(CNS|NUMERO CNS|CNS DO PACIENTE|CARTAO SUS|CARTAO NACIONAL DE SAUDE|NUMERO DO CARTAO SUS)$/.test(rotulo);
+        };
+        const extrair15Digitos = function (valor) {
+            const digitos = String(valor || "").replace(/\D/g, "");
+            return digitos.length === 15 ? digitos : "";
+        };
+
+        // 1) Tabelas: o CADWEB pode entregar o rótulo e o CNS em células
+        // adjacentes ou em linhas consecutivas.
+        if (Array.isArray(dados.tabelas)) {
+            for (const tabela of dados.tabelas) {
+                if (!Array.isArray(tabela)) continue;
+                for (let i = 0; i < tabela.length; i++) {
+                    const linha = Array.isArray(tabela[i]) ? tabela[i] : [];
+                    for (let j = 0; j < linha.length; j++) {
+                        if (!ehRotuloCNS(linha[j])) continue;
+
+                        for (let k = j + 1; k < linha.length; k++) {
+                            const valor = extrair15Digitos(linha[k]);
+                            if (valor) return valor;
+                            if (normalizarRotulo(linha[k])) break;
+                        }
+
+                        for (let proxima = i + 1; proxima < tabela.length; proxima++) {
+                            const celulas = Array.isArray(tabela[proxima]) ? tabela[proxima] : [];
+                            for (const celula of celulas) {
+                                if (ehRotuloCNS(celula)) break;
+                                const valor = extrair15Digitos(celula);
+                                if (valor) return valor;
+                            }
+                            if (celulas.some(ehRotuloCNS)) break;
+                        }
+                    }
                 }
             }
         }
 
-        // Depois procura o CNS identificado no texto bruto da página.
-        const texto = String(dados && dados.texto || "");
+        // 2) Campos estruturados (inputs/selects) do CADWEB.
+        if (Array.isArray(dados.campos)) {
+            for (const item of dados.campos) {
+                if (ehRotuloCNS(item.campo)) {
+                    const valor = extrair15Digitos(item.valor);
+                    if (valor) return valor;
+                }
+            }
+        }
+
+        // 3) Texto bruto, preservando a busca anterior como alternativa.
+        const texto = String(dados.texto || "");
         const padroes = [
             /(?:CNS|Cart[aã]o\s*(?:Nacional\s*)?de?\s*Sa[uú]de)\s*[:\-]?\s*(\d{3}\s*\d{4}\s*\d{4}\s*\d{4})/i,
             /(?:CNS|Cart[aã]o\s*(?:Nacional\s*)?de?\s*Sa[uú]de)[\s\S]{0,80}?(\d{15})/i
@@ -429,7 +476,6 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             }
         }
 
-        // Última alternativa: procura uma sequência de 15 dígitos no texto.
         const sequencias = texto.match(/\b\d{15}\b/g) || [];
         return sequencias.length === 1 ? sequencias[0] : "";
     }
