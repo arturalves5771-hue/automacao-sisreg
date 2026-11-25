@@ -1258,22 +1258,24 @@ function extrairResumoDoTextoCNS(texto) {
 
     // Compatibilidade com o formato antigo do CADWEB, no qual alguns campos
     // aparecem agrupados na mesma linha/trecho de texto.
-    let nome = localizar(["Nome", "Nome do Paciente", "Nome do Usuário", "Nome Completo"]);
-    if (!nome) {
-        const nomeBlock = clean.match(/Nome:\s*Nome Social \/ Apelido:\s*([\s\S]*?)(?=Nome da Mãe:)/i);
-        if (nomeBlock) nome = nomeBlock[1].trim().replace(/\n/g, " ").split("---")[0].trim();
+    let nome = "";
+    const nomeBlock = clean.match(/Nome:\s*Nome Social \/ Apelido:\s*([\s\S]*?)(?=Nome da Mãe:)/i);
+    if (nomeBlock) {
+        nome = nomeBlock[1].trim().replace(/\n/g, " ").split("---")[0].trim();
+    } else {
+        nome = localizar(["Nome", "Nome do Paciente", "Nome do Usuário", "Nome Completo"]);
     }
 
-    let mae = localizar(["Nome da Mãe", "Mãe", "Nome Materno"]);
-    if (!mae) {
-        const maeBlock = clean.match(/Nome da Mãe:\s*Nome do Pai:\s*([\s\S]*?)(?=Sexo:)/i);
-        if (maeBlock) {
-            const valor = maeBlock[1].trim().replace(/\n/g, " ");
-            const palavras = valor.split(/\s+/).filter(Boolean);
-            mae = palavras.length >= 4
-                ? palavras.slice(0, Math.floor(palavras.length / 2)).join(" ")
-                : valor;
-        }
+    let mae = "";
+    const maeBlock = clean.match(/Nome da Mãe:\s*Nome do Pai:\s*([\s\S]*?)(?=Sexo:)/i);
+    if (maeBlock) {
+        const valor = maeBlock[1].trim().replace(/\n/g, " ");
+        const palavras = valor.split(/\s+/).filter(Boolean);
+        mae = palavras.length >= 4
+            ? palavras.slice(0, Math.floor(palavras.length / 2)).join(" ")
+            : valor;
+    } else {
+        mae = localizar(["Nome da Mãe", "Mãe", "Nome Materno"]);
     }
 
     const cns = localizar(["CNS", "Número CNS", "Cartão SUS", "Cartão Nacional de Saúde"]) ||
