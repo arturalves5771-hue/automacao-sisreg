@@ -1538,6 +1538,11 @@ window.addEventListener("message", function (event) {
         dados.consultas = Array.isArray(event.data.consultas) ? event.data.consultas : [];
         resultadoConsultaCNS.textContent = JSON.stringify(dados, null, 2);
         exibirResumoPacienteCNS(dados);
+        if (event.data.pesquisarSolicitacoes === false) {
+            contadorConsultasCNS.textContent = "Não pesquisadas";
+            const avisoSolicitacoes = corpoTabelaConsultasCNS.querySelector(".estado-vazio-consultas");
+            if (avisoSolicitacoes) avisoSolicitacoes.textContent = "Pesquisa de solicitações desativada nesta consulta.";
+        }
         btnCopiarDadosCNS.disabled = false;
         return;
     }
