@@ -587,7 +587,8 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                 await chrome.tabs.sendMessage(dados.abaNossaPagina, {
                     type: message.type,
                     jsonData: message.jsonData,
-                    mensagem: message.mensagem
+                    mensagem: message.mensagem,
+                    pesquisarSolicitacoes: message.pesquisarSolicitacoes
                 });
             } catch (e) {}
         }
