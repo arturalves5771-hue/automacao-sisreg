@@ -396,7 +396,8 @@ if (location.hostname === "sisregiii.saude.gov.br") {
 
         chrome.runtime.sendMessage({
             type: "DADOS_CNS_SUCESSO",
-            jsonData: dados
+            jsonData: dados,
+            pesquisarSolicitacoes: false
         });
     }
 
