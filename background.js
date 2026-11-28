@@ -119,6 +119,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
             consultaCNSResultado: null,
             consultaCNSNumeroEncontrado: null,
             consultaCNSConsultas: [],
+            consultaPesquisarSolicitacoes: message.pesquisarSolicitacoes !== false,
             consultaEtapa: "cadweb",
             reautenticacaoCNSIniciada: false,
             abaNossaPagina: abaNossaPagina
@@ -213,7 +214,7 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
         if (!tabId) return;
 
         const dados = await chrome.storage.session.get([
-            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado"
+            "loginSISREG", "abaSISREG", "abaNossaPagina", "operacaoAtual", "exportacaoCSV", "exportacaoIniciada", "tentativaEnviada", "consultaCNS", "consultaCNSIniciada", "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado", "consultaPesquisarSolicitacoes"
         ]);
 
         if (dados.abaSISREG !== tabId) return;
@@ -251,7 +252,8 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                     try {
                         await chrome.tabs.sendMessage(tabId, {
                             type: "EXECUTAR_CONSULTA_CNS",
-                            numero: dados.consultaCNS?.numero
+                            numero: dados.consultaCNS?.numero,
+                            pesquisarSolicitacoes: dados.consultaPesquisarSolicitacoes !== false
                         });
                     } catch (e) {}
                 }
@@ -312,7 +314,8 @@ chrome.runtime.onMessage.addListener(async function (message, sender) {
                     await chrome.tabs.sendMessage(tabId, { type: "REINICIAR_CONSULTA_CNS" });
                     await chrome.tabs.sendMessage(tabId, {
                         type: "EXECUTAR_CONSULTA_CNS",
-                        numero: dados.consultaCNS?.numero
+                        numero: dados.consultaCNS?.numero,
+                        pesquisarSolicitacoes: dados.consultaPesquisarSolicitacoes !== false
                     });
                 } catch (erro) {
                     console.error("Não foi possível retomar a consulta após o login automático:", erro);
@@ -718,7 +721,7 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
     const dados = await chrome.storage.session.get([
         "abaSISREG", "operacaoAtual", "consultaCNS",
         "consultaCNSAguardandoNavegacao", "consultaCNSAguardandoResultado",
-        "consultaEtapa", "consultaCNSNumeroEncontrado"
+        "consultaEtapa", "consultaCNSNumeroEncontrado", "consultaPesquisarSolicitacoes"
     ]);
     if (dados.abaSISREG !== tabId || dados.operacaoAtual !== "consultar_cns") return;
 
@@ -751,7 +754,10 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo) {
     if (dados.consultaCNSAguardandoResultado) {
         await chrome.storage.session.set({ consultaCNSAguardandoResultado: false });
         try {
-            await chrome.tabs.sendMessage(tabId, { type: "CAPTURAR_RESULTADO_CNS" });
+            await chrome.tabs.sendMessage(tabId, {
+                type: "CAPTURAR_RESULTADO_CNS",
+                pesquisarSolicitacoes: dados.consultaPesquisarSolicitacoes !== false
+            });
         } catch (e) {
             console.error("Não foi possível capturar o resultado do CADWEB:", e);
         }
