@@ -640,16 +640,16 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
 .controle-solicitacoes-texto{display:grid;gap:5px;min-width:0}
 .controle-solicitacoes-titulo{color:#16443c;font-size:14px;font-weight:800}
 .controle-solicitacoes-descricao{color:#687b76;font-size:12px;line-height:1.45}
-.chave-solicitacoes{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-height:46px;padding:7px 13px;border:1px solid #b8d9c4;border-radius:999px;background:#e8f7ed;color:#17683c;box-shadow:0 3px 9px rgba(22,101,52,.08)}
-.chave-solicitacoes:hover:not(:disabled){transform:translateY(-1px);background:#ddf2e4}
-.chave-solicitacoes-trilho{position:relative;width:42px;height:24px;flex:0 0 42px;border-radius:999px;background:#22a45a;transition:background .2s ease}
-.chave-solicitacoes-bola{position:absolute;top:3px;left:21px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:left .2s ease}
-.chave-solicitacoes-estado{min-width:62px;text-align:center;font-size:11px;font-weight:900;letter-spacing:.65px}
+.chave-solicitacoes{display:flex;align-items:center;gap:13px;flex:0 0 auto;min-height:64px;padding:10px 17px;border:2px solid #b8d9c4;border-radius:18px;background:#e8f7ed;color:#17683c;box-shadow:0 4px 12px rgba(22,101,52,.10);cursor:pointer;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.chave-solicitacoes:hover:not(:disabled){transform:translateY(-2px);background:#ddf2e4}
+.chave-solicitacoes-trilho{position:relative;width:66px;height:36px;flex:0 0 66px;border-radius:999px;background:#22a45a;transition:background .22s ease}
+.chave-solicitacoes-bola{position:absolute;top:4px;left:34px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:left .22s ease}
+.chave-solicitacoes-estado{min-width:132px;text-align:left;font-size:12px;font-weight:900;letter-spacing:.45px;line-height:1.25}
 .chave-solicitacoes.desligada{border-color:#d5dce0;background:#f1f3f5;color:#52616b;box-shadow:none}
 .chave-solicitacoes.desligada:hover:not(:disabled){background:#e8ecef}
 .chave-solicitacoes.desligada .chave-solicitacoes-trilho{background:#9aa6ad}
-.chave-solicitacoes.desligada .chave-solicitacoes-bola{left:3px}
-@media(max-width:600px){.controle-solicitacoes{align-items:flex-start;flex-direction:column}.chave-solicitacoes{align-self:flex-start}}
+.chave-solicitacoes.desligada .chave-solicitacoes-bola{left:4px}
+@media(max-width:600px){.controle-solicitacoes{align-items:flex-start;flex-direction:column}.chave-solicitacoes{align-self:stretch;justify-content:center}.chave-solicitacoes-estado{min-width:0}}
 @media(prefers-reduced-motion:reduce){.chave-solicitacoes-trilho,.chave-solicitacoes-bola{transition:none}}
 
 /* Tela de processamento da consulta CNS */
@@ -697,13 +697,13 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
                 maxlength="18" placeholder="Digite o CNS ou CPF (somente números)">
             <div class="controle-solicitacoes" id="controleSolicitacoes">
                 <div class="controle-solicitacoes-texto">
-                    <span class="controle-solicitacoes-titulo">Pesquisa de solicitações</span>
-                    <span class="controle-solicitacoes-descricao" id="descricaoPesquisaSolicitacoes">Ligada: consulta os dados do paciente e também as solicitações.</span>
+                    <span class="controle-solicitacoes-titulo">Modo de consulta</span>
+                    <span class="controle-solicitacoes-descricao" id="descricaoPesquisaSolicitacoes">Modo completo: dados do paciente + solicitações.</span>
                 </div>
                 <button type="button" class="chave-solicitacoes ligada" id="chavePesquisaSolicitacoes"
-                    role="switch" aria-checked="true" aria-label="Ativar ou desativar a pesquisa de solicitações">
-                    <span class="chave-solicitacoes-trilho"><span class="chave-solicitacoes-bola"></span></span>
-                    <span class="chave-solicitacoes-estado" id="estadoPesquisaSolicitacoes">LIGADA</span>
+                    role="switch" aria-checked="true" aria-label="Alternar entre modo econômico e modo completo">
+                    <span class="chave-solicitacoes-trilho" aria-hidden="true"><span class="chave-solicitacoes-bola"></span></span>
+                    <span class="chave-solicitacoes-estado" id="estadoPesquisaSolicitacoes">MODO COMPLETO</span>
                 </button>
             </div>
             <div class="acoes-consulta-cns">
@@ -873,10 +873,10 @@ function atualizarChavePesquisaSolicitacoes(){
     chavePesquisaSolicitacoes.classList.toggle("ligada",pesquisaSolicitacoesAtiva);
     chavePesquisaSolicitacoes.classList.toggle("desligada",!pesquisaSolicitacoesAtiva);
     chavePesquisaSolicitacoes.setAttribute("aria-checked",String(pesquisaSolicitacoesAtiva));
-    estadoPesquisaSolicitacoes.textContent=pesquisaSolicitacoesAtiva?"LIGADA":"DESLIGADA";
+    estadoPesquisaSolicitacoes.textContent=pesquisaSolicitacoesAtiva?"MODO COMPLETO":"MODO ECONÔMICO";
     descricaoPesquisaSolicitacoes.textContent=pesquisaSolicitacoesAtiva
-        ?"Ligada: consulta os dados do paciente e também as solicitações."
-        :"Desligada: consulta somente os dados cadastrais do paciente.";
+        ?"Dados do paciente + solicitações."
+        :"Apenas dados do paciente.";
 }
 atualizarChavePesquisaSolicitacoes();
 chavePesquisaSolicitacoes.addEventListener("click",function(){
