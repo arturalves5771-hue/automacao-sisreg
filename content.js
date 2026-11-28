@@ -13,7 +13,8 @@ window.addEventListener("message", function (event) {
         if (!numero) return;
         chrome.runtime.sendMessage({
             type: "CONSULTAR_DADOS_CNS",
-            numero: numero
+            numero: numero,
+            pesquisarSolicitacoes: event.data.pesquisarSolicitacoes !== false
         });
         return;
     }
@@ -930,6 +931,8 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
     }
 
+    let consultaPesquisarSolicitacoes = true;
+
     async function processarResultadoInicial(documento) {
         if (resultadoCNSProcessado) return;
         resultadoCNSProcessado = true;
@@ -942,6 +945,13 @@ if (location.hostname === "sisregiii.saude.gov.br") {
                 type: "CONSULTA_CNS_ERRO",
                 mensagem: "A pesquisa inicial foi concluída, mas não consegui identificar um Cartão do SUS com 15 dígitos no resultado do CADWEB."
             });
+            return;
+        }
+
+        // Modo econômico: encerra após obter os dados do paciente.
+        // Não abre CONSULTA AMB > SOLICITAÇÕES e não dispara a pesquisa cns_paciente.
+        if (!consultaPesquisarSolicitacoes) {
+            enviarResultadoCNS(dados);
             return;
         }
 
@@ -1137,6 +1147,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
             if (consultaCNSExecutando) return;
             consultaCNSExecutando = true;
             consultaCNSResultadoEnviado = false;
+            consultaPesquisarSolicitacoes = message.pesquisarSolicitacoes !== false;
             executarConsultaCNS(message.numero);
             return;
         }
@@ -1152,6 +1163,7 @@ if (location.hostname === "sisregiii.saude.gov.br") {
         }
 
         if (message.type === "CAPTURAR_RESULTADO_CNS") {
+            consultaPesquisarSolicitacoes = message.pesquisarSolicitacoes !== false;
             const docResultado = localizarDocumentoResultado();
             if (docResultado) {
                 processarResultadoInicial(docResultado);
