@@ -651,6 +651,23 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
 .chave-solicitacoes.desligada .chave-solicitacoes-bola{left:3px}
 @media(max-width:600px){.controle-solicitacoes{align-items:flex-start;flex-direction:column}.chave-solicitacoes{align-self:flex-start}}
 @media(prefers-reduced-motion:reduce){.chave-solicitacoes-trilho,.chave-solicitacoes-bola{transition:none}}
+
+/* Tela de processamento da consulta CNS */
+#telaCarregamentoCNS{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(9,31,27,.68);backdrop-filter:blur(5px)}
+#telaCarregamentoCNS.oculto{display:none!important}
+.carregamento-cartao{width:min(440px,100%);padding:34px 30px;border:1px solid rgba(255,255,255,.65);border-radius:22px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.25);text-align:center}
+.carregamento-icone{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 19px;border-radius:18px;background:#e7f2ee;color:#17634f;font-size:27px}
+.carregamento-spinner{width:25px;height:25px;border:3px solid #c8ddd4;border-top-color:#16834b;border-radius:50%;animation:carregamento-giro .8s linear infinite}
+.carregamento-cartao h2{margin:0;color:#16443c;font-size:21px;letter-spacing:-.4px}
+.carregamento-cartao p{min-height:40px;margin:10px 0 22px;color:#687b76;font-size:13px;line-height:1.55}
+.carregamento-trilho{height:10px;overflow:hidden;border-radius:99px;background:#e8efeb}
+#barraProgressoCNS{width:4%;height:100%;border-radius:99px;background:linear-gradient(90deg,#16834b,#48b47c);transition:width .55s ease}
+.carregamento-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;color:#71817b;font-size:11px}
+#percentualProgressoCNS{color:#17634f;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.carregamento-aviso{display:block;margin-top:20px;color:#96a39d;font-size:10px;line-height:1.5}
+@keyframes carregamento-giro{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.carregamento-spinner{animation:none}#barraProgressoCNS{transition:none}}
+
 </style>
 </head>
 <body>
@@ -779,6 +796,20 @@ body{display:block;min-height:100vh;min-height:100svh;padding:0;overflow-x:hidde
 
 </div>
 
+
+<div id="telaCarregamentoCNS" class="oculto" role="status" aria-live="polite" aria-label="Consulta em andamento">
+    <div class="carregamento-cartao">
+        <div class="carregamento-icone"><span class="carregamento-spinner" aria-hidden="true"></span></div>
+        <h2>Estamos consultando o SISREG</h2>
+        <p id="etapaCarregamentoCNS">Preparando a consulta...</p>
+        <div class="carregamento-trilho" role="progressbar" aria-label="Progresso estimado da consulta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="4" id="trilhoProgressoCNS">
+            <div id="barraProgressoCNS"></div>
+        </div>
+        <div class="carregamento-meta"><span>Processamento em andamento</span><strong id="percentualProgressoCNS">4%</strong></div>
+        <small class="carregamento-aviso">O indicador é uma estimativa visual. O tempo real depende da resposta do SISREG. Não feche esta tela enquanto a consulta estiver em andamento.</small>
+    </div>
+</div>
+
 <script>
 if(sessionStorage.getItem("sisreg_autenticado")!=="1")window.location.replace("login.html");
 const dataInicial=document.getElementById("dataInicial");
@@ -789,6 +820,51 @@ const btnSelecionarPasta=document.getElementById("btnSelecionarPasta");
 const statusPasta=document.getElementById("statusPasta");
 const numeroConsultaCNS=document.getElementById("numeroConsultaCNS");
 const btnConsultarCNS=document.getElementById("btnConsultarCNS");
+
+const telaCarregamentoCNS=document.getElementById("telaCarregamentoCNS");
+const etapaCarregamentoCNS=document.getElementById("etapaCarregamentoCNS");
+const barraProgressoCNS=document.getElementById("barraProgressoCNS");
+const percentualProgressoCNS=document.getElementById("percentualProgressoCNS");
+const trilhoProgressoCNS=document.getElementById("trilhoProgressoCNS");
+let temporizadorProgressoCNS=null;
+let progressoEstimadoCNS=4;
+let etapaAtualCNS=0;
+const etapasProgressoCNS=[
+    "Conectando ao ambiente do SISREG...",
+    "Localizando a consulta por CNS/CPF...",
+    "Enviando os dados para pesquisa...",
+    "Aguardando o retorno dos dados do paciente...",
+    "Organizando as informações recebidas..."
+];
+function atualizarProgressoCNS(valor){
+    progressoEstimadoCNS=Math.min(92,Math.max(4,valor));
+    barraProgressoCNS.style.width=progressoEstimadoCNS+"%";
+    percentualProgressoCNS.textContent=Math.round(progressoEstimadoCNS)+"%";
+    trilhoProgressoCNS.setAttribute("aria-valuenow",String(Math.round(progressoEstimadoCNS)));
+}
+function iniciarCarregamentoCNS(){
+    pararCarregamentoCNS();
+    progressoEstimadoCNS=4;
+    etapaAtualCNS=0;
+    atualizarProgressoCNS(4);
+    etapaCarregamentoCNS.textContent=etapasProgressoCNS[0];
+    telaCarregamentoCNS.classList.remove("oculto");
+    temporizadorProgressoCNS=setInterval(function(){
+        if(progressoEstimadoCNS<35) atualizarProgressoCNS(progressoEstimadoCNS+4+Math.random()*5);
+        else if(progressoEstimadoCNS<68) atualizarProgressoCNS(progressoEstimadoCNS+1.5+Math.random()*3);
+        else if(progressoEstimadoCNS<88) atualizarProgressoCNS(progressoEstimadoCNS+.5+Math.random()*1.5);
+        if(progressoEstimadoCNS>=22&&etapaAtualCNS<1) etapaAtualCNS=1;
+        if(progressoEstimadoCNS>=43&&etapaAtualCNS<2) etapaAtualCNS=2;
+        if(progressoEstimadoCNS>=65&&etapaAtualCNS<3) etapaAtualCNS=3;
+        if(progressoEstimadoCNS>=82&&etapaAtualCNS<4) etapaAtualCNS=4;
+        etapaCarregamentoCNS.textContent=etapasProgressoCNS[etapaAtualCNS];
+    },650);
+}
+function pararCarregamentoCNS(){
+    if(temporizadorProgressoCNS){clearInterval(temporizadorProgressoCNS);temporizadorProgressoCNS=null;}
+    telaCarregamentoCNS.classList.add("oculto");
+}
+
 const chavePesquisaSolicitacoes=document.getElementById("chavePesquisaSolicitacoes");
 const estadoPesquisaSolicitacoes=document.getElementById("estadoPesquisaSolicitacoes");
 const descricaoPesquisaSolicitacoes=document.getElementById("descricaoPesquisaSolicitacoes");
@@ -1516,6 +1592,7 @@ btnConsultarCNS.addEventListener("click", function () {
     btnCopiarDadosCNS.disabled = true;
     btnConsultarCNS.disabled = true;
     btnConsultarCNS.textContent = "CONSULTANDO...";
+    iniciarCarregamentoCNS();
     exibirMensagemConsultaCNS("⏳ Abrindo o SISREG e realizando a consulta. Aguarde...", "sucesso");
 
     window.postMessage({
@@ -1530,6 +1607,7 @@ window.addEventListener("message", function (event) {
     if (event.source !== window || !event.data) return;
 
     if (event.data.type === "DADOS_CNS_SUCESSO") {
+        pararCarregamentoCNS();
         btnConsultarCNS.disabled = false;
         btnConsultarCNS.textContent = "CONSULTAR DADOS";
         exibirMensagemConsultaCNS("✅ Consulta concluída. Confira os dados abaixo.", "sucesso");
@@ -1548,6 +1626,7 @@ window.addEventListener("message", function (event) {
     }
 
     if (event.data.type === "CONSULTA_CNS_ERRO") {
+        pararCarregamentoCNS();
         const mensagemErro = event.data.mensagem || "Não foi possível concluir a consulta.";
 
         // Quando o SISREG informa que a sessão não está autenticada,
